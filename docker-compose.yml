@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      - postgres
+    networks:
+      - star-trek-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend
+    networks:
+      - star-trek-network
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=star_trek_diplomacy
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - star-trek-network
+
+volumes:
+  postgres-data:
+
+networks:
+  star-trek-network:
+    driver: bridge

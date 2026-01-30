@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* LCARS-inspired styling */
+.lcars-panel {
+  @apply bg-space-blue border-2 border-lcars-orange rounded-lg p-4;
+}
+
+.lcars-button {
+  @apply bg-lcars-orange text-black font-bold py-2 px-6 rounded-full 
+         hover:bg-lcars-tan transition-colors cursor-pointer;
+}
+
+.lcars-button-blue {
+  @apply bg-lcars-blue text-black font-bold py-2 px-6 rounded-full 
+         hover:bg-blue-300 transition-colors cursor-pointer;
+}
+
+.lcars-header {
+  @apply text-lcars-orange text-2xl font-bold uppercase tracking-wider;
+}
+
+/* Faction colors */
+.faction-federation { @apply text-federation; }
+.faction-klingon { @apply text-klingon; }
+.faction-romulan { @apply text-romulan; }
+.faction-cardassian { @apply text-cardassian; }
+.faction-ferengi { @apply text-ferengi; }
+.faction-breen { @apply text-breen; }
+.faction-gorn { @apply text-gorn; }
+
+/* Map styling */
+.map-container {
+  @apply w-full h-full bg-space-dark relative overflow-hidden;
+}
+
+.system-node {
+  @apply absolute w-4 h-4 rounded-full cursor-pointer 
+         hover:ring-2 hover:ring-white transition-all;
+}
+
+.system-node.selected {
+  @apply ring-2 ring-yellow-400;
+}
+
+.hyperlane {
+  @apply absolute bg-gray-600 opacity-30;
+  height: 2px;
+  transform-origin: left center;
+}
+
+/* Unit markers */
+.unit-marker {
+  @apply absolute w-6 h-6 rounded-full border-2 border-white
+         flex items-center justify-center text-xs font-bold;
+}
+
+/* Order panel */
+.order-panel {
+  @apply fixed right-0 top-0 h-full w-80 bg-space-blue border-l-4 
+         border-lcars-orange p-4 overflow-y-auto;
+}
+
+/* Chat panel */
+.chat-panel {
+  @apply fixed left-0 bottom-0 w-96 h-64 bg-space-blue border-t-4 
+         border-r-4 border-lcars-purple rounded-tr-lg;
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .order-panel {
+    @apply w-full h-auto bottom-0 top-auto max-h-[40vh];
+  }
+  
+  .chat-panel {
+    @apply w-full left-0 right-0;
+  }
+}
