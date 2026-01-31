@@ -5,177 +5,189 @@
 const express = require('express');
 const router = express.Router();
 const GameManager = require('../game-manager');
+const { getGameList } = require('../database');
 
 const games = new Map();
 
+// Get list of all games (for reconnection)
+router.get('/', (req, res) => {
+  try {
+    const gameList = getGameList();
+    res.json({ success: true, games: gameList });
+  } catch (error) {
+    console.error('Error fetching game list:', error);
+    res.status(500).json({ error: 'Failed to fetch game list' });
+  }
+});
+
 // Get game state
 router.get('/:gameId', (req, res) => {
-    const game = games.get(req.params.gameId);
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    res.json(game.getPublicState());
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  res.json(game.getPublicState());
 });
 
 // Get game state for specific player (includes their private info)
 router.get('/:gameId/player/:faction', (req, res) => {
-    const game = games.get(req.params.gameId);
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    res.json(game.getPlayerState(req.params.faction));
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  res.json(game.getPlayerState(req.params.faction));
 });
 
 // Submit orders
 router.post('/:gameId/orders', (req, res) => {
-    const { faction, orders } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
+  const { faction, orders } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.submitOrders(faction, orders);
+
+  if (result.success) {
+    // Notify other players via WebSocket
+    const io = req.app.get('io');
+    io.to(`game:${req.params.gameId}`).emit('orders_submitted', { faction });
+
+    // Check if all orders are in
+    if (game.allOrdersSubmitted()) {
+      const resolution = game.resolvePhase();
+      io.to(`game:${req.params.gameId}`).emit('phase_resolved', resolution);
     }
-    
-    const result = game.submitOrders(faction, orders);
-    
-    if (result.success) {
-        // Notify other players via WebSocket
-        const io = req.app.get('io');
-        io.to(`game:${req.params.gameId}`).emit('orders_submitted', { faction });
-        
-        // Check if all orders are in
-        if (game.allOrdersSubmitted()) {
-            const resolution = game.resolvePhase();
-            io.to(`game:${req.params.gameId}`).emit('phase_resolved', resolution);
-        }
-    }
-    
-    res.json(result);
+  }
+
+  res.json(result);
 });
 
 // Get available moves for a unit
 router.get('/:gameId/moves/:location', (req, res) => {
-    const game = games.get(req.params.gameId);
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const moves = game.getAvailableMoves(req.params.location);
-    res.json({ location: req.params.location, moves });
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const moves = game.getAvailableMoves(req.params.location);
+  res.json({ location: req.params.location, moves });
 });
 
 // Submit retreat orders
 router.post('/:gameId/retreats', (req, res) => {
-    const { faction, retreats } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = game.submitRetreats(faction, retreats);
-    res.json(result);
+  const { faction, retreats } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.submitRetreats(faction, retreats);
+  res.json(result);
 });
 
 // Submit builds/disbands
 router.post('/:gameId/builds', (req, res) => {
-    const { faction, builds } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = game.submitBuilds(faction, builds);
-    res.json(result);
+  const { faction, builds } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.submitBuilds(faction, builds);
+  res.json(result);
 });
 
 // Get turn history
 router.get('/:gameId/history', (req, res) => {
-    const game = games.get(req.params.gameId);
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    res.json(game.getHistory());
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  res.json(game.getHistory());
 });
 
 // Alliance actions
 router.post('/:gameId/alliance/propose', (req, res) => {
-    const { from, to, type } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = game.proposeAlliance(from, to, type);
-    
-    if (result.success) {
-        const io = req.app.get('io');
-        io.to(`game:${req.params.gameId}`).emit('alliance_proposed', {
-            to,
-            proposalId: result.proposal.id
-        });
-    }
-    
-    res.json(result);
+  const { from, to, type } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.proposeAlliance(from, to, type);
+
+  if (result.success) {
+    const io = req.app.get('io');
+    io.to(`game:${req.params.gameId}`).emit('alliance_proposed', {
+      to,
+      proposalId: result.proposal.id,
+    });
+  }
+
+  res.json(result);
 });
 
 router.post('/:gameId/alliance/respond', (req, res) => {
-    const { proposalId, faction, accept } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = accept 
-        ? game.acceptAlliance(proposalId, faction)
-        : game.rejectAlliance(proposalId, faction);
-    
-    if (result.success && accept) {
-        const io = req.app.get('io');
-        io.to(`game:${req.params.gameId}`).emit('alliance_formed', result);
-    }
-    
-    res.json(result);
+  const { proposalId, faction, accept } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = accept
+    ? game.acceptAlliance(proposalId, faction)
+    : game.rejectAlliance(proposalId, faction);
+
+  if (result.success && accept) {
+    const io = req.app.get('io');
+    io.to(`game:${req.params.gameId}`).emit('alliance_formed', result);
+  }
+
+  res.json(result);
 });
 
 // Break alliance
 router.post('/:gameId/alliance/break', (req, res) => {
-    const { faction } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = game.alliances.breakAlliance(faction);
-    
-    if (result.success) {
-        const io = req.app.get('io');
-        io.to(`game:${req.params.gameId}`).emit('alliance_broken', {
-            betrayer: faction,
-            betrayed: result.betrayed
-        });
-    }
-    
-    res.json(result);
+  const { faction } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.alliances.breakAlliance(faction);
+
+  if (result.success) {
+    const io = req.app.get('io');
+    io.to(`game:${req.params.gameId}`).emit('alliance_broken', {
+      betrayer: faction,
+      betrayed: result.betrayed,
+    });
+  }
+
+  res.json(result);
 });
 
 // Use faction ability
 router.post('/:gameId/ability', (req, res) => {
-    const { faction, ability, params } = req.body;
-    const game = games.get(req.params.gameId);
-    
-    if (!game) {
-        return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const result = game.useAbility(faction, ability, params);
-    res.json(result);
+  const { faction, ability, params } = req.body;
+  const game = games.get(req.params.gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.useAbility(faction, ability, params);
+  res.json(result);
 });
 
 // Export for use in main server

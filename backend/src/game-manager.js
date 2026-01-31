@@ -18,6 +18,7 @@ const {
 const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('../../shared/map-data');
 const { LatinumEconomy, AbilityManager, FACTION_ABILITIES } = require('./engine/faction-abilities');
 const { AllianceManager } = require('./engine/alliance-system');
+const { saveGame, saveTurn, saveOrder, saveMessage, loadGame, getActiveGames } = require('./database');
 
 class GameManager {
   constructor(gameId, playerFactions, settings = {}) {
@@ -260,6 +261,9 @@ class GameManager {
     // Clear pending orders
     this.pendingOrders = {};
 
+    // Save to database after resolution
+    this.saveToDatabase();
+
     // Check for retreats needed
     if (Object.keys(this.state.dislodged).length > 0) {
       this.phase = 'retreats';
@@ -326,6 +330,9 @@ class GameManager {
 
     this.pendingRetreats = {};
 
+    // Save to database after resolution
+    this.saveToDatabase();
+
     // If Fall, go to builds
     if (this.state.season === 'fall') {
       this.updateOwnership();
@@ -380,6 +387,9 @@ class GameManager {
 
     this.pendingBuilds = {};
 
+    // Save to database after resolution
+    this.saveToDatabase();
+
     return this.advanceTurn(results);
   }
 
@@ -423,6 +433,7 @@ class GameManager {
     // Check allied victory first
     const alliedVictory = this.alliances.checkAlliedVictory(this.state, VICTORY_CONDITIONS);
     if (alliedVictory.victory) {
+      this.saveToDatabase(); // Save immediately on victory
       return alliedVictory;
     }
 
@@ -432,6 +443,7 @@ class GameManager {
 
       const sc = this.state.countSupplyCenters(faction);
       if (sc >= conditions.supplyCenters) {
+        this.saveToDatabase(); // Save immediately on victory
         return {
           victory: true,
           winners: [faction],
@@ -443,6 +455,7 @@ class GameManager {
       // Ferengi latinum victory
       if (faction === 'ferengi' && conditions.latinum) {
         if (this.economy.getBalance('ferengi') >= conditions.latinum) {
+          this.saveToDatabase(); // Save immediately on victory
           return {
             victory: true,
             winners: ['ferengi'],
@@ -560,6 +573,10 @@ class GameManager {
     };
 
     this.messages.push(message);
+    
+    // Save message to database
+    saveMessage(this.gameId, from, isPublic ? null : to, content);
+    
     return message;
   }
 
@@ -588,7 +605,23 @@ class GameManager {
       history: this.history,
       messages: this.messages,
       winner: this.winner,
+      turn: this.state.turn,
+      year: this.state.year,
+      season: this.state.season,
     };
+  }
+
+  /**
+   * Save game state to database
+   */
+  saveToDatabase() {
+    try {
+      const gameData = this.toJSON();
+      saveGame(this.gameId, gameData, this.playerFactions);
+      console.log(`Game ${this.gameId} saved to database`);
+    } catch (error) {
+      console.error(`Error saving game ${this.gameId}:`, error);
+    }
   }
 
   /**
@@ -619,6 +652,34 @@ class GameManager {
     game.winner = data.winner;
 
     return game;
+  }
+
+  /**
+   * Load all active games from database
+   */
+  static loadActiveGames() {
+    console.log('Loading active games from database...');
+    const games = new Map();
+    
+    try {
+      const activeGames = getActiveGames();
+      
+      for (const { gameId, gameData } of activeGames) {
+        try {
+          const game = GameManager.fromJSON(gameData);
+          games.set(gameId, game);
+          console.log(`Loaded game ${gameId} - Turn ${game.state.turn}, ${game.state.season} ${game.state.year}`);
+        } catch (error) {
+          console.error(`Error loading game ${gameId}:`, error);
+        }
+      }
+      
+      console.log(`Successfully loaded ${games.size} active game(s)`);
+    } catch (error) {
+      console.error('Error loading active games:', error);
+    }
+    
+    return games;
   }
 }
 

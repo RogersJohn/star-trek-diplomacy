@@ -163,6 +163,9 @@ router.post('/:lobbyId/start', (req, res) => {
     const game = new GameManager(gameId, playerFactions, lobby.settings);
     games.set(gameId, game);
     
+    // Save initial game state to database
+    game.saveToDatabase();
+    
     lobby.status = 'started';
     lobby.gameId = gameId;
     
