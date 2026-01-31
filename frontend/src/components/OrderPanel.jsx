@@ -1,4 +1,5 @@
 import { useGameStore } from '../hooks/useGameStore'
+import { FACTION_NAMES } from '../../../../shared/map-data'
 
 export default function OrderPanel({ gameState, myState, faction }) {
   const { 
@@ -12,6 +13,8 @@ export default function OrderPanel({ gameState, myState, faction }) {
   const myUnits = myState?.myUnits || []
   const phase = gameState?.phase || 'orders'
   const submitted = gameState?.ordersSubmitted?.includes(faction)
+  const allFactions = ['federation', 'klingon', 'romulan', 'cardassian', 'ferengi', 'breen', 'gorn']
+  const activeFactions = allFactions.filter(f => gameState?.eliminated ? !gameState.eliminated.includes(f) : true)
   
   const handleSubmit = async () => {
     const result = await submitOrders()
@@ -122,7 +125,7 @@ export default function OrderPanel({ gameState, myState, faction }) {
       )}
       
       {/* Submit Button */}
-      {phase === 'orders' && (
+      {(phase === 'orders' || phase === 'retreat' || phase === 'build') && (
         <button
           onClick={handleSubmit}
           disabled={submitted || pendingOrders.length === 0}
@@ -134,17 +137,127 @@ export default function OrderPanel({ gameState, myState, faction }) {
                 : 'bg-lcars-orange hover:bg-lcars-tan text-black'
             }`}
         >
-          {submitted ? '✓ Orders Submitted' : 'Submit Orders'}
+          {submitted ? '✓ Orders Submitted' : 
+           phase === 'retreat' ? 'Submit Retreats' :
+           phase === 'build' ? 'Submit Builds' :
+           'Submit Orders'}
         </button>
       )}
       
       {/* Waiting Message */}
-      {submitted && (
-        <div className="text-center text-gray-400 text-sm mt-4">
-          Waiting for other players...
-          <div className="mt-2">
-            {gameState?.ordersSubmitted?.length || 0} / {Object.keys(gameState?.units || {}).length > 0 ? '?' : '0'} ready
+      {submitted && phase === 'orders' && (
+        <div className="mt-4 p-3 bg-gray-800 rounded">
+          <div className="text-center text-lcars-orange text-sm font-bold mb-2">
+            Waiting for other players...
           </div>
+          <div className="text-xs space-y-1">
+            {activeFactions.map(f => (
+              <div key={f} className="flex items-center justify-between">
+                <span className={f === faction ? 'text-white' : 'text-gray-400'}>
+                  {FACTION_NAMES[f] || f}
+                </span>
+                <span>
+                  {gameState?.ordersSubmitted?.includes(f) 
+                    ? <span className="text-green-400">✓ Ready</span>
+                    : <span className="text-yellow-400">⏳ Pending</span>
+                  }
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Resolution Results */}
+      {phase === 'resolution' && gameState?.lastResolution && (
+        <div className="mt-4">
+          <h3 className="text-lcars-orange text-sm font-bold mb-2">Resolution Results</h3>
+          <div className="space-y-2 max-h-64 overflow-y-auto bg-gray-800 p-2 rounded text-xs">
+            {gameState.lastResolution.moves?.map((move, i) => (
+              <div key={i} className={move.success ? 'text-green-400' : 'text-red-400'}>
+                {move.success ? '✓' : '✗'} {move.from} → {move.to}
+                {!move.success && move.reason && <div className="text-gray-400 text-xs ml-4">{move.reason}</div>}
+              </div>
+            ))}
+            {gameState.lastResolution.dislodged?.length > 0 && (
+              <div className="text-yellow-400 mt-2">
+                ⚠ Dislodged: {gameState.lastResolution.dislodged.join(', ')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Retreat Phase UI */}
+      {phase === 'retreat' && myState?.dislodgedUnits?.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-red-400 text-sm font-bold mb-2">⚠ Units Dislodged - Must Retreat</h3>
+          <div className="space-y-2">
+            {myState.dislodgedUnits.map((unit, i) => (
+              <div key={i} className="bg-red-900/30 p-2 rounded">
+                <div className="text-sm mb-1">{unit.location}</div>
+                <div className="text-xs text-gray-400 mb-2">
+                  Retreat to: {unit.retreatOptions?.join(', ') || 'None - must disband'}
+                </div>
+                {unit.retreatOptions?.length > 0 && (
+                  <select 
+                    className="w-full bg-gray-700 rounded px-2 py-1 text-sm"
+                    onChange={(e) => addOrder({ type: 'retreat', location: unit.location, destination: e.target.value })}
+                  >
+                    <option value="">Select retreat...</option>
+                    {unit.retreatOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    <option value="disband">Disband unit</option>
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Build Phase UI */}
+      {phase === 'build' && myState?.buildCount !== undefined && (
+        <div className="mt-4">
+          <h3 className="text-lcars-blue text-sm font-bold mb-2">
+            {myState.buildCount > 0 ? `Build ${myState.buildCount} Units` : `Disband ${-myState.buildCount} Units`}
+          </h3>
+          {myState.buildCount > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs text-gray-400 mb-2">Build in home centers:</div>
+              {myState.availableBuildLocations?.map(loc => (
+                <div key={loc} className="flex gap-2">
+                  <button
+                    onClick={() => addOrder({ type: 'build', location: loc, unitType: 'army' })}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
+                  >
+                    Build Army @ {loc}
+                  </button>
+                  <button
+                    onClick={() => addOrder({ type: 'build', location: loc, unitType: 'fleet' })}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
+                  >
+                    Build Fleet @ {loc}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {myState.buildCount < 0 && (
+            <div className="space-y-1">
+              <div className="text-xs text-gray-400 mb-2">Select units to disband:</div>
+              {myUnits.map(unit => (
+                <button
+                  key={unit.location}
+                  onClick={() => addOrder({ type: 'disband', location: unit.location })}
+                  className="w-full bg-gray-700 hover:bg-red-600 rounded px-2 py-1 text-xs text-left"
+                >
+                  Disband {unit.type} @ {unit.location}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       
