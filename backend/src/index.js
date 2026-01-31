@@ -48,15 +48,43 @@ io.on('connection', (socket) => {
         socket.leave(`game:${gameId}`);
     });
     
-    // Send private message
-    socket.on('private_message', ({ gameId, from, to, message }) => {
-        io.to(`game:${gameId}`).emit('message', {
-            type: 'private',
-            from,
-            to,
-            message,
-            timestamp: new Date().toISOString()
-        });
+    // Join a lobby room
+    socket.on('join_lobby', (lobbyId) => {
+        socket.join(`lobby:${lobbyId}`);
+        console.log(`${socket.id} joined lobby ${lobbyId}`);
+    });
+    
+    // Private message (direct to one faction)
+    socket.on('private_message', ({ from, to, message, timestamp }) => {
+        // Send to all clients in the game room - they'll filter client-side
+        const rooms = Array.from(socket.rooms);
+        const gameRoom = rooms.find(r => r.startsWith('game:'));
+        
+        if (gameRoom) {
+            io.to(gameRoom).emit('private_message', {
+                from,
+                to,
+                message,
+                timestamp: timestamp || Date.now()
+            });
+            console.log(`Private message from ${from} to ${to}`);
+        }
+    });
+    
+    // Broadcast message (to all players)
+    socket.on('broadcast_message', ({ from, message, timestamp }) => {
+        const rooms = Array.from(socket.rooms);
+        const gameRoom = rooms.find(r => r.startsWith('game:'));
+        
+        if (gameRoom) {
+            io.to(gameRoom).emit('broadcast_message', {
+                from,
+                to: 'all',
+                message,
+                timestamp: timestamp || Date.now()
+            });
+            console.log(`Broadcast message from ${from}`);
+        }
     });
     
     // Broadcast order submission
