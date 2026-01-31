@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/clerk-react'
 import { useGameStore } from '../hooks/useGameStore'
 
 const FACTIONS = [
@@ -14,24 +15,28 @@ const FACTIONS = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const { user } = useUser()
   const { playerName, setPlayerName } = useGameStore()
-  const [name, setName] = useState(playerName)
+  const [name, setName] = useState(playerName || user?.firstName || user?.username || '')
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
   
   const handleCreateLobby = async () => {
-    if (!name.trim()) {
-      setError('Please enter your name')
-      return
-    }
+    const displayName = name.trim() || user?.firstName || user?.username || 'Player';
     
-    setPlayerName(name)
+    setPlayerName(displayName)
     
     try {
       const res = await fetch('/api/lobby/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostName: name })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getToken()}`
+        },
+        body: JSON.stringify({ 
+          hostName: displayName,
+          userId: user.id 
+        })
       })
       
       const data = await res.json()
@@ -47,23 +52,26 @@ export default function Home() {
   }
   
   const handleJoinLobby = async () => {
-    if (!name.trim()) {
-      setError('Please enter your name')
-      return
-    }
+    const displayName = name.trim() || user?.firstName || user?.username || 'Player';
     
     if (!joinCode.trim()) {
       setError('Please enter a lobby code')
       return
     }
     
-    setPlayerName(name)
+    setPlayerName(displayName)
     
     try {
       const res = await fetch(`/api/lobby/${joinCode}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: name })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getToken()}`
+        },
+        body: JSON.stringify({ 
+          playerName: displayName,
+          userId: user.id
+        })
       })
       
       const data = await res.json()

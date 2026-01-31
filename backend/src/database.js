@@ -98,6 +98,31 @@ function initializeDatabase() {
     )
   `);
 
+  // Users table - tracks authenticated users
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      user_id TEXT PRIMARY KEY,
+      username TEXT,
+      created_at INTEGER NOT NULL,
+      last_seen INTEGER NOT NULL
+    )
+  `);
+
+  // User Games table - associates users with games for history tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_games (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      game_id TEXT NOT NULL,
+      faction TEXT NOT NULL,
+      result TEXT,
+      ended_at INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
+      UNIQUE(user_id, game_id)
+    )
+  `);
+
   // Create indexes for common queries
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
@@ -105,6 +130,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_turns_game ON turns(game_id);
     CREATE INDEX IF NOT EXISTS idx_orders_game_turn ON orders(game_id, turn_number);
     CREATE INDEX IF NOT EXISTS idx_messages_game ON messages(game_id);
+    CREATE INDEX IF NOT EXISTS idx_user_games_user ON user_games(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_games_game ON user_games(game_id);
   `);
 
   console.log('Database schema initialized successfully');
@@ -116,7 +143,7 @@ function initializeDatabase() {
 function saveGame(gameId, gameData, playerFactions) {
   const now = Date.now();
   const gameDataJSON = JSON.stringify(gameData);
-  
+
   const stmt = db.prepare(`
     INSERT INTO games (game_id, created_at, updated_at, game_data, status, winner)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -137,7 +164,9 @@ function saveGame(gameId, gameData, playerFactions) {
   );
 
   // Save players if this is a new game
-  const existingPlayers = db.prepare('SELECT COUNT(*) as count FROM players WHERE game_id = ?').get(gameId);
+  const existingPlayers = db
+    .prepare('SELECT COUNT(*) as count FROM players WHERE game_id = ?')
+    .get(gameId);
   if (existingPlayers.count === 0) {
     const playerStmt = db.prepare(`
       INSERT INTO players (game_id, faction, player_name, joined_at)
@@ -156,7 +185,7 @@ function saveGame(gameId, gameData, playerFactions) {
 function loadGame(gameId) {
   const stmt = db.prepare('SELECT game_data FROM games WHERE game_id = ? AND status = ?');
   const row = stmt.get(gameId, 'active');
-  
+
   if (!row) {
     return null;
   }
@@ -202,15 +231,7 @@ function saveTurn(gameId, turnNumber, year, season, phase, turnData) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  stmt.run(
-    gameId,
-    turnNumber,
-    year,
-    season,
-    phase,
-    Date.now(),
-    JSON.stringify(turnData)
-  );
+  stmt.run(gameId, turnNumber, year, season, phase, Date.now(), JSON.stringify(turnData));
 }
 
 /**
@@ -222,14 +243,7 @@ function saveOrder(gameId, turnNumber, faction, orderType, orderData) {
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
-  stmt.run(
-    gameId,
-    turnNumber,
-    faction,
-    orderType,
-    JSON.stringify(orderData),
-    Date.now()
-  );
+  stmt.run(gameId, turnNumber, faction, orderType, JSON.stringify(orderData), Date.now());
 }
 
 /**
@@ -314,7 +328,7 @@ function getGameList() {
  * Delete old completed games (optional cleanup)
  */
 function deleteOldGames(daysOld = 30) {
-  const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+  const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000;
   const stmt = db.prepare(`
     DELETE FROM games
     WHERE status = 'ended' AND updated_at < ?
@@ -323,7 +337,94 @@ function deleteOldGames(daysOld = 30) {
   const result = stmt.run(cutoffTime);
   return result.changes;
 }
+/**
+ * Create or update user record
+ */
+function upsertUser(userId, username) {
+  const now = Date.now();
+  const stmt = db.prepare(`
+    INSERT INTO users (user_id, username, created_at, last_seen)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      username = excluded.username,
+      last_seen = excluded.last_seen
+  `);
 
+  stmt.run(userId, username, now, now);
+}
+
+/**
+ * Associate user with a game
+ */
+function createUserGame(userId, gameId, faction) {
+  const stmt = db.prepare(`
+    INSERT INTO user_games (user_id, game_id, faction, result, ended_at)
+    VALUES (?, ?, ?, NULL, NULL)
+    ON CONFLICT(user_id, game_id) DO NOTHING
+  `);
+
+  stmt.run(userId, gameId, faction);
+}
+
+/**
+ * Record game result for user
+ */
+function recordGameResult(userId, gameId, result) {
+  const stmt = db.prepare(`
+    UPDATE user_games
+    SET result = ?, ended_at = ?
+    WHERE user_id = ? AND game_id = ?
+  `);
+
+  stmt.run(result, Date.now(), userId, gameId);
+}
+
+/**
+ * Get user's game history
+ */
+function getUserGameHistory(userId, limit = 10) {
+  const stmt = db.prepare(`
+    SELECT 
+      ug.game_id,
+      ug.faction,
+      ug.result,
+      ug.ended_at,
+      g.status,
+      json_extract(g.game_data, '$.turn') as final_turn
+    FROM user_games ug
+    JOIN games g ON ug.game_id = g.game_id
+    WHERE ug.user_id = ?
+    ORDER BY COALESCE(ug.ended_at, g.updated_at) DESC
+    LIMIT ?
+  `);
+
+  return stmt.all(userId, limit);
+}
+
+/**
+ * Get user stats (win rate, total games, etc.)
+ */
+function getUserStats(userId) {
+  const stmt = db.prepare(`
+    SELECT 
+      COUNT(*) as total_games,
+      SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
+      SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses,
+      SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) as draws
+    FROM user_games
+    WHERE user_id = ? AND result IS NOT NULL
+  `);
+
+  const stats = stmt.get(userId);
+  
+  return {
+    totalGames: stats.total_games || 0,
+    wins: stats.wins || 0,
+    losses: stats.losses || 0,
+    draws: stats.draws || 0,
+    winRate: stats.total_games > 0 ? (stats.wins / stats.total_games) * 100 : 0,
+  };
+}
 // Initialize on module load
 initializeDatabase();
 
@@ -339,4 +440,9 @@ module.exports = {
   endGame,
   getGameList,
   deleteOldGames,
+  upsertUser,
+  createUserGame,
+  recordGameResult,
+  getUserGameHistory,
+  getUserStats,
 };

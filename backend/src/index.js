@@ -10,6 +10,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const gameRoutes = require('./api/game-routes');
 const lobbyRoutes = require('./api/lobby-routes');
+const userRoutes = require('./api/user-routes');
 const GameManager = require('./game-manager');
 const { games } = require('./api/game-routes');
 
@@ -34,6 +35,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/game', gameRoutes);
 app.use('/api/lobby', lobbyRoutes);
+app.use('/api/user', userRoutes);
 
 // WebSocket handling
 io.on('connection', socket => {
