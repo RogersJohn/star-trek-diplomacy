@@ -6,6 +6,8 @@ import GameMap from './map/GameMap';
 import OrderPanel from './OrderPanel';
 import StatusBar from './StatusBar';
 import Messages from './Messages';
+import FactionAbilityPanel from './FactionAbilityPanel';
+import FactionAbilityPanel from './FactionAbilityPanel';
 
 export default function Game() {
   const { gameId } = useParams();
@@ -15,6 +17,30 @@ export default function Game() {
   const [selectedFaction, setSelectedFaction] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
+
+  // Handle faction ability usage
+  const handleUseAbility = async (abilityName, params) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/ability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faction: selectedFaction, ability: abilityName, params }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh game state after ability use
+        fetchGameState();
+        fetchPlayerState();
+      } else {
+        alert(result.reason || 'Failed to use ability');
+      }
+    } catch (error) {
+      console.error('Failed to use ability:', error);
+      alert('Failed to use ability');
+    }
+  };
 
   useEffect(() => {
     connect();
@@ -167,6 +193,13 @@ export default function Game() {
       {/* Status Bar */}
       <StatusBar gameState={gameState} myState={myState} faction={selectedFaction} />
 
+      {/* Faction Ability Panel */}
+      {selectedFaction && myState && !gameState?.winner && (
+        <div className="px-4 pt-4">
+          <FactionAbilityPanel gameState={myState} onUseAbility={handleUseAbility} />
+        </div>
+      )}
+
       {/* Elimination Banner */}
       {isEliminated && (
         <div className="bg-red-900 border-b-2 border-red-500 px-4 py-2 text-center">
@@ -253,13 +286,10 @@ export default function Game() {
           disabled={isEliminated}
         />
       </div>
-      
+
       {/* Messages Panel */}
       {selectedFaction && !gameState?.winner && (
-        <Messages 
-          gameState={gameState} 
-          faction={selectedFaction}
-        />
+        <Messages gameState={gameState} faction={selectedFaction} />
       )}
     </div>
   );
