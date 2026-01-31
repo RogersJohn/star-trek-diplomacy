@@ -135,6 +135,33 @@ router.post('/:gameId/alliance/respond', (req, res) => {
         ? game.acceptAlliance(proposalId, faction)
         : game.rejectAlliance(proposalId, faction);
     
+    if (result.success && accept) {
+        const io = req.app.get('io');
+        io.to(`game:${req.params.gameId}`).emit('alliance_formed', result);
+    }
+    
+    res.json(result);
+});
+
+// Break alliance
+router.post('/:gameId/alliance/break', (req, res) => {
+    const { faction } = req.body;
+    const game = games.get(req.params.gameId);
+    
+    if (!game) {
+        return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    const result = game.alliances.breakAlliance(faction);
+    
+    if (result.success) {
+        const io = req.app.get('io');
+        io.to(`game:${req.params.gameId}`).emit('alliance_broken', {
+            betrayer: faction,
+            betrayed: result.betrayed
+        });
+    }
+    
     res.json(result);
 });
 

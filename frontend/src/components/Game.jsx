@@ -7,7 +7,7 @@ import OrderPanel from './OrderPanel';
 import StatusBar from './StatusBar';
 import Messages from './Messages';
 import FactionAbilityPanel from './FactionAbilityPanel';
-import FactionAbilityPanel from './FactionAbilityPanel';
+import AlliancePanel from './AlliancePanel';
 
 export default function Game() {
   const { gameId } = useParams();
@@ -39,6 +39,76 @@ export default function Game() {
     } catch (error) {
       console.error('Failed to use ability:', error);
       alert('Failed to use ability');
+    }
+  };
+
+  // Handle alliance proposal
+  const handleProposeAlliance = async (from, to, type) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/alliance/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to, type }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchGameState();
+        fetchPlayerState();
+      } else {
+        alert(result.reason || 'Failed to propose alliance');
+      }
+    } catch (error) {
+      console.error('Failed to propose alliance:', error);
+      alert('Failed to propose alliance');
+    }
+  };
+
+  // Handle alliance response
+  const handleRespondToProposal = async (proposalId, faction, accept) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/alliance/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalId, faction, accept }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchGameState();
+        fetchPlayerState();
+      } else {
+        alert(result.reason || 'Failed to respond to proposal');
+      }
+    } catch (error) {
+      console.error('Failed to respond to proposal:', error);
+      alert('Failed to respond to proposal');
+    }
+  };
+
+  // Handle break alliance
+  const handleBreakAlliance = async (faction) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/alliance/break`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faction }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchGameState();
+        fetchPlayerState();
+        alert(result.message || 'Alliance broken!');
+      } else {
+        alert(result.reason || 'Failed to break alliance');
+      }
+    } catch (error) {
+      console.error('Failed to break alliance:', error);
+      alert('Failed to break alliance');
     }
   };
 
@@ -197,6 +267,19 @@ export default function Game() {
       {selectedFaction && myState && !gameState?.winner && (
         <div className="px-4 pt-4">
           <FactionAbilityPanel gameState={myState} onUseAbility={handleUseAbility} />
+        </div>
+      )}
+
+      {/* Alliance Panel */}
+      {selectedFaction && myState && !gameState?.winner && (
+        <div className="px-4 pt-4">
+          <AlliancePanel
+            gameState={gameState}
+            myState={myState}
+            onProposeAlliance={handleProposeAlliance}
+            onRespondToProposal={handleRespondToProposal}
+            onBreakAlliance={handleBreakAlliance}
+          />
         </div>
       )}
 

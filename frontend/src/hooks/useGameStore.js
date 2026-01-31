@@ -51,6 +51,24 @@ export const useGameStore = create((set, get) => ({
       // Update UI to show who has submitted
     })
     
+    socket.on('alliance_proposed', ({ to, proposalId }) => {
+      // Refresh state to show new proposal
+      get().fetchGameState()
+      get().fetchPlayerState()
+    })
+    
+    socket.on('alliance_formed', () => {
+      // Refresh state to show new alliance
+      get().fetchGameState()
+      get().fetchPlayerState()
+    })
+    
+    socket.on('alliance_broken', ({ betrayer, betrayed }) => {
+      // Refresh state to show broken alliance
+      get().fetchGameState()
+      get().fetchPlayerState()
+    })
+    
     set({ socket })
   },
   
