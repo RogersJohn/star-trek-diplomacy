@@ -1,0 +1,22 @@
+# Development Dockerfile for backend
+FROM node:18-alpine
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies including devDependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Expose development port
+EXPOSE 3001
+
+# Run development server
+CMD ["npm", "run", "dev"]

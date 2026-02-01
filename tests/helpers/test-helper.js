@@ -1,12 +1,23 @@
 /**
  * Test Helper - Common utilities for Selenium tests
+ *
+ * Environment variables:
+ *   BASE_URL     - Frontend URL (default: http://localhost:5173)
+ *   API_URL      - Backend API URL (default: http://localhost:3001)
+ *   HEADLESS     - Run Chrome in headless mode (default: false)
+ *   SELENIUM_HOST - Remote Selenium server (optional, for Docker)
  */
 
 const { Builder, By, until, Key } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
+const os = require('os');
+const path = require('path');
 
-const BASE_URL = 'http://localhost:5173';
-const API_URL = 'http://localhost:3000';
+// Configuration from environment variables
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const API_URL = process.env.API_URL || 'http://localhost:3001';
+const HEADLESS = process.env.HEADLESS === 'true' || process.env.HEADLESS === '1';
+const SELENIUM_HOST = process.env.SELENIUM_HOST || null;
 
 const PLAYERS = {
   PLAYER1: { id: 'dev_player1', name: 'Player1', index: 0 },
@@ -40,7 +51,10 @@ class TestHelper {
   async createDriver(playerKey) {
     const player = PLAYERS[playerKey];
     const options = new chrome.Options();
-    const tempDir = `C:/temp/chrome-test-${player.name}-${this.testId}`;
+
+    // Cross-platform temp directory
+    const tempBase = process.env.CHROME_TEMP_DIR || os.tmpdir();
+    const tempDir = path.join(tempBase, `chrome-test-${player.name}-${this.testId}`);
 
     options.addArguments(`--user-data-dir=${tempDir}`);
     options.addArguments('--window-size=1200,900');
@@ -48,12 +62,25 @@ class TestHelper {
     options.addArguments('--no-default-browser-check');
     options.addArguments('--disable-default-apps');
     options.addArguments('--disable-extensions');
+    options.addArguments('--disable-gpu');
+    options.addArguments('--disable-dev-shm-usage');
+    options.addArguments('--no-sandbox');
 
-    const driver = await new Builder()
+    // Headless mode for CI/Docker
+    if (HEADLESS) {
+      options.addArguments('--headless=new');
+    }
+
+    let builder = new Builder()
       .forBrowser('chrome')
-      .setChromeOptions(options)
-      .build();
+      .setChromeOptions(options);
 
+    // Use remote Selenium server if specified (for Docker)
+    if (SELENIUM_HOST) {
+      builder = builder.usingServer(SELENIUM_HOST);
+    }
+
+    const driver = await builder.build();
     this.drivers.set(playerKey, driver);
     return driver;
   }
@@ -410,6 +437,7 @@ module.exports = {
   FACTIONS,
   BASE_URL,
   API_URL,
+  HEADLESS,
   By,
   until,
   Key,

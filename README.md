@@ -116,6 +116,34 @@ npm test -- --testPathPattern="lobby.test"    # Lobby tests only
 npm test -- --testPathPattern="smoke.test"    # Quick smoke tests
 ```
 
+### Run Tests in Docker
+
+You can run the entire test suite in Docker containers:
+
+```bash
+# Run all tests in Docker (builds and runs backend, frontend, and tests)
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+# Clean up after tests
+docker-compose -f docker-compose.test.yml down -v
+```
+
+**Environment Variables for Tests:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BASE_URL` | `http://localhost:5173` | Frontend URL |
+| `API_URL` | `http://localhost:3001` | Backend API URL |
+| `HEADLESS` | `false` | Run Chrome in headless mode |
+| `SELENIUM_HOST` | - | Remote Selenium server URL (for Docker) |
+| `CHROME_TEMP_DIR` | System temp | Directory for Chrome user data |
+
+**Running Tests Locally in Headless Mode:**
+```bash
+cd tests
+HEADLESS=true npm test
+```
+
 ---
 
 ## Project Structure
