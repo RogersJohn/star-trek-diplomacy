@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
+import { useDevAuth } from '../hooks/useDevAuth'
 import { useGameStore } from '../hooks/useGameStore'
 
 const FACTIONS = [
@@ -13,34 +14,48 @@ const FACTIONS = [
   { id: 'gorn', name: 'Gorn Hegemony', color: 'gorn' },
 ]
 
-export default function Home() {
+export default function Home({ devMode }) {
   const navigate = useNavigate()
-  const { user } = useUser()
+
+  // Use appropriate auth based on mode
+  const clerkUser = devMode ? null : useUser()?.user;
+  const devAuth = devMode ? useDevAuth() : null;
+  const user = devMode ? devAuth?.user : clerkUser;
+
   const { playerName, setPlayerName } = useGameStore()
   const [name, setName] = useState(playerName || user?.firstName || user?.username || '')
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
-  
+
+  const getAuthHeaders = async () => {
+    if (devMode) {
+      return { 'Content-Type': 'application/json' };
+    }
+    const token = await user?.getToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+    };
+  };
+
   const handleCreateLobby = async () => {
     const displayName = name.trim() || user?.firstName || user?.username || 'Player';
-    
+
     setPlayerName(displayName)
-    
+
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/lobby/create', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user.getToken()}`
-        },
-        body: JSON.stringify({ 
+        headers,
+        body: JSON.stringify({
           hostName: displayName,
-          userId: user.id 
+          userId: user?.id
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         navigate(`/lobby/${data.lobby.id}`)
       } else {
@@ -50,32 +65,30 @@ export default function Home() {
       setError('Connection failed')
     }
   }
-  
+
   const handleJoinLobby = async () => {
     const displayName = name.trim() || user?.firstName || user?.username || 'Player';
-    
+
     if (!joinCode.trim()) {
       setError('Please enter a lobby code')
       return
     }
-    
+
     setPlayerName(displayName)
-    
+
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/lobby/${joinCode}/join`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user.getToken()}`
-        },
-        body: JSON.stringify({ 
+        headers,
+        body: JSON.stringify({
           playerName: displayName,
-          userId: user.id
+          userId: user?.id
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         navigate(`/lobby/${joinCode}`)
       } else {
@@ -85,7 +98,7 @@ export default function Home() {
       setError('Connection failed')
     }
   }
-  
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
       {/* Title */}
@@ -100,17 +113,17 @@ export default function Home() {
           A game of galactic negotiation and betrayal
         </p>
       </div>
-      
+
       {/* Main Panel */}
       <div className="lcars-panel max-w-md w-full">
         <h3 className="lcars-header mb-6">Enter the Quadrant</h3>
-        
+
         {error && (
           <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded mb-4">
             {error}
           </div>
         )}
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-lcars-tan text-sm mb-1">Your Name</label>
@@ -119,24 +132,24 @@ export default function Home() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Captain..."
-              className="w-full bg-space-dark border-2 border-lcars-orange rounded px-4 py-2 
+              className="w-full bg-space-dark border-2 border-lcars-orange rounded px-4 py-2
                        text-white focus:outline-none focus:border-lcars-tan"
             />
           </div>
-          
+
           <button
             onClick={handleCreateLobby}
             className="lcars-button w-full"
           >
             CREATE NEW GAME
           </button>
-          
+
           <div className="flex items-center gap-4 my-6">
             <div className="flex-1 h-px bg-lcars-orange/30"></div>
             <span className="text-lcars-orange/50 text-sm">OR</span>
             <div className="flex-1 h-px bg-lcars-orange/30"></div>
           </div>
-          
+
           <div>
             <label className="block text-lcars-tan text-sm mb-1">Lobby Code</label>
             <input
@@ -145,12 +158,12 @@ export default function Home() {
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="ABC123"
               maxLength={6}
-              className="w-full bg-space-dark border-2 border-lcars-blue rounded px-4 py-2 
+              className="w-full bg-space-dark border-2 border-lcars-blue rounded px-4 py-2
                        text-white uppercase tracking-widest text-center text-xl
                        focus:outline-none focus:border-lcars-tan"
             />
           </div>
-          
+
           <button
             onClick={handleJoinLobby}
             className="lcars-button-blue w-full"
@@ -159,15 +172,15 @@ export default function Home() {
           </button>
         </div>
       </div>
-      
+
       {/* Faction Preview */}
       <div className="mt-12 text-center">
         <h3 className="text-lcars-tan text-sm mb-4">7 PLAYABLE FACTIONS</h3>
         <div className="flex flex-wrap justify-center gap-4">
           {FACTIONS.map(f => (
-            <div 
+            <div
               key={f.id}
-              className={`faction-${f.color} text-sm font-bold px-3 py-1 
+              className={`faction-${f.color} text-sm font-bold px-3 py-1
                          border-2 border-current rounded-full opacity-70`}
             >
               {f.name}

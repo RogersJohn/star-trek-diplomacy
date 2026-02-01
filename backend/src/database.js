@@ -135,6 +135,29 @@ function initializeDatabase() {
   `);
 
   console.log('Database schema initialized successfully');
+
+  // Create dev test users (player1 through player7)
+  createDevUsers();
+}
+
+/**
+ * Create predefined dev users for testing
+ */
+function createDevUsers() {
+  const now = Date.now();
+  const stmt = db.prepare(`
+    INSERT INTO users (user_id, username, created_at, last_seen)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO NOTHING
+  `);
+
+  for (let i = 1; i <= 7; i++) {
+    const userId = `dev_player${i}`;
+    const username = `Player${i}`;
+    stmt.run(userId, username, now, now);
+  }
+
+  console.log('Dev test users created (player1-player7)');
 }
 
 /**

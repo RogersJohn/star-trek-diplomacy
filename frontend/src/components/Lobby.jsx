@@ -34,15 +34,19 @@ export default function Lobby() {
   useEffect(() => {
     if (socket) {
       socket.emit('join_lobby', lobbyId)
-      
+
       socket.on('player_joined', fetchLobby)
       socket.on('player_left', fetchLobby)
       socket.on('faction_selected', fetchLobby)
       socket.on('player_ready_changed', fetchLobby)
       socket.on('game_started', ({ gameId }) => {
+        // Store faction in localStorage so Game component can retrieve it
+        if (selectedFaction) {
+          localStorage.setItem(`game_${gameId}_faction`, selectedFaction)
+        }
         navigate(`/game/${gameId}`)
       })
-      
+
       return () => {
         socket.off('player_joined')
         socket.off('player_left')
@@ -51,7 +55,7 @@ export default function Lobby() {
         socket.off('game_started')
       }
     }
-  }, [socket])
+  }, [socket, selectedFaction, navigate, lobbyId])
   
   const fetchLobby = async () => {
     try {

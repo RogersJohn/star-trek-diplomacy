@@ -36,7 +36,13 @@ router.post('/create', optionalAuth, (req, res) => {
     status: 'waiting',
     createdAt: new Date().toISOString(),
   };
-optionalAuth, (req, res) => {
+
+  lobbies.set(lobbyId, lobby);
+  res.json({ success: true, lobby });
+});
+
+// Join a lobby
+router.post('/:lobbyId/join', optionalAuth, (req, res) => {
   const { playerName, userId } = req.body;
   const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
@@ -68,14 +74,6 @@ optionalAuth, (req, res) => {
   }
 
   lobby.players.push({ name: playerName, faction: null, ready: false, userId: actualUserId });
-
-  // Notify via WebSocket
-  const io = req.app.get('io');
-  io.to(`lobby:${req.params.lobbyId}`).emit('player_joined', { playerName });
-
-  res.json({ success: true, lobby });
-
-  lobby.players.push({ name: playerName, faction: null, ready: false });
 
   // Notify via WebSocket
   const io = req.app.get('io');

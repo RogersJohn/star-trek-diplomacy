@@ -5,72 +5,118 @@ A 7-player grand strategy game set in the Star Trek universe, based on the class
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
+
+- **Node.js 18+** - [Download here](https://nodejs.org/)
+- **npm** (comes with Node.js)
+- **Chrome browser** (for running tests)
+
+Verify installation:
+```bash
+node --version   # Should show v18.x.x or higher
+npm --version    # Should show 9.x.x or higher
+```
 
 ### Installation
 
 ```bash
-# Clone/download this repo
-cd star-trek-diplomacy
+# 1. Clone the repository
+git clone https://github.com/RogersJohn/star-trek-diplomacy.git
+cd star-trek-diplomacy/star-trek-diplomacy
 
-# Install backend dependencies
+# 2. Install backend dependencies
 cd backend
 npm install
 
-# Install frontend dependencies
+# 3. Install frontend dependencies
 cd ../frontend
+npm install
+
+# 4. (Optional) Install test dependencies
+cd ../tests
 npm install
 ```
 
-### Running Locally
+### Running the Game
 
-**Terminal 1 - Backend:**
+You need **two terminal windows** running simultaneously:
+
+**Terminal 1 - Start the Backend Server:**
 ```bash
 cd backend
 npm run dev
 ```
+Wait for: `Server running on port 3001`
 
-**Terminal 2 - Frontend:**
+**Terminal 2 - Start the Frontend:**
 ```bash
 cd frontend
 npm run dev
 ```
+Wait for: `Local: http://localhost:5173`
 
-Open http://localhost:5173 in your browser.
+**Open the game:**
+Navigate to **http://localhost:5173** in your browser.
 
-## Game Overview
+### Playing with Multiple Players
 
-### Factions (7 players)
+For local testing with multiple players:
+1. Open http://localhost:5173 in multiple browser windows/tabs
+2. Each window can log in as a different test player (Player1-Player7)
+3. One player creates a lobby, others join with the lobby code
+4. Select factions, mark ready, and start the game
 
-| Faction | Home Systems | Victory | Special Ability |
-|---------|--------------|---------|-----------------|
-| **Federation** | 5 | 10 SC | Diplomatic Immunity (prevent 1 dislodge) |
-| **Klingon** | 5 | 12 SC | Warrior's Rage (+1 attack, -1 defense) |
-| **Romulan** | 4 | 8 SC | Tal Shiar (reveal enemy orders) |
-| **Cardassian** | 5 | 14 SC | Obsidian Order (see move destinations) |
-| **Ferengi** | 3 | 9 SC or 100 Latinum | Rules of Acquisition (bribe, sabotage) |
-| **Breen** | 6 | 18 SC | Energy Dampening (freeze territory) |
-| **Gorn** | 5 | 9 SC | Reptilian Resilience (50% survive destruction) |
+For remote play, deploy to a hosting service (see Deployment section).
 
-### Map Structure
+---
 
-- **Core Sector** (Layer 2): Main battlefield with all 48 supply centers
-- **Upper Hyperspace** (Layer 3): Bypass routes for flanking
-- **Lower Hyperspace** (Layer 1): Additional bypass routes
+## Game Rules
 
-### Victory Conditions
+See **[RULES.md](RULES.md)** for complete game rules including:
+- Turn structure and phases
+- Order types (Hold, Move, Support, Convoy)
+- Combat resolution
+- Victory conditions
+- Faction abilities with timing rules
 
-1. **Solo Victory**: Control required supply centers
-2. **Allied Victory**: Form secret alliance, combined SC meets threshold
-3. **Latinum Victory** (Ferengi only): Accumulate 100 latinum bars
+---
 
-### Key Mechanics
+## Factions
 
-- **Simultaneous Orders**: All players submit orders secretly, then resolve together
-- **Support**: Units can support attacks or defenses in adjacent territories
-- **Retreats**: Dislodged units must retreat or disband
-- **Builds**: Gain/lose units based on supply center control (Fall turns)
+| Faction | Starting Units | Victory Threshold | Special Ability |
+|---------|----------------|-------------------|-----------------|
+| **Federation** | 5 fleets | 10 supply centers | Diplomatic Immunity (prevent 1 dislodge/game) |
+| **Klingon** | 5 fleets | 12 supply centers | Warrior's Rage (+1 attack, -1 defense) |
+| **Romulan** | 4 fleets | 8 supply centers | Tal Shiar Intel (reveal 1-2 enemy orders) |
+| **Cardassian** | 5 fleets | 14 supply centers | Obsidian Order (see move destinations) |
+| **Ferengi** | 3 fleets | 9 SC or 100 latinum | Rules of Acquisition (bribe/sabotage) |
+| **Breen** | 6 fleets | 18 supply centers | Energy Dampening (freeze territory/game) |
+| **Gorn** | 5 fleets | 9 supply centers | Reptilian Resilience (50% survive destruction) |
+
+---
+
+## Running Tests
+
+The project includes a comprehensive Selenium E2E test suite (272 tests).
+
+### Prerequisites for Tests
+- Chrome browser installed
+- ChromeDriver (automatically managed by selenium-webdriver)
+- Backend and frontend servers running
+
+### Run All Tests
+```bash
+# Make sure backend is running in another terminal first
+cd tests
+npm test
+```
+
+### Run Specific Test Suite
+```bash
+npm test -- --testPathPattern="lobby.test"    # Lobby tests only
+npm test -- --testPathPattern="smoke.test"    # Quick smoke tests
+```
+
+---
 
 ## Project Structure
 
@@ -78,86 +124,117 @@ Open http://localhost:5173 in your browser.
 star-trek-diplomacy/
 ├── backend/
 │   ├── src/
-│   │   ├── engine/           # Core game logic
+│   │   ├── engine/              # Core game logic
 │   │   │   ├── diplomacy-engine.js
 │   │   │   ├── map-data.js
 │   │   │   ├── faction-abilities.js
 │   │   │   └── alliance-system.js
-│   │   ├── api/              # REST endpoints
-│   │   │   ├── game-routes.js
-│   │   │   └── lobby-routes.js
-│   │   ├── game-manager.js   # Game instance manager
-│   │   └── index.js          # Express server
+│   │   ├── api/                 # REST endpoints
+│   │   ├── game-manager.js
+│   │   ├── database.js          # SQLite persistence
+│   │   └── index.js             # Express + Socket.io server
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/       # React components
+│   │   ├── components/          # React components
 │   │   │   ├── Home.jsx
 │   │   │   ├── Lobby.jsx
 │   │   │   ├── Game.jsx
 │   │   │   ├── OrderPanel.jsx
-│   │   │   ├── StatusBar.jsx
-│   │   │   └── map/
-│   │   │       └── GameMap.jsx
-│   │   ├── hooks/
-│   │   │   └── useGameStore.js
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── index.html
+│   │   │   ├── AlliancePanel.jsx
+│   │   │   ├── FactionAbilityPanel.jsx
+│   │   │   ├── MessagesPanel.jsx
+│   │   │   └── map/GameMap.jsx
+│   │   ├── hooks/useGameStore.js
+│   │   └── App.jsx
 │   └── package.json
-├── shared/                   # Shared data structures
-├── docs/                     # Documentation
+├── tests/
+│   ├── helpers/test-helper.js   # Test utilities
+│   ├── pages/                   # Page objects
+│   ├── *.test.js                # Test suites
+│   └── package.json
+├── RULES.md                     # Official game rules
 └── README.md
 ```
 
-## API Endpoints
+---
 
-### Lobby
-- `POST /api/lobby/create` - Create new game lobby
-- `GET /api/lobby/:id` - Get lobby info
-- `POST /api/lobby/:id/join` - Join lobby
-- `POST /api/lobby/:id/select-faction` - Choose faction
-- `POST /api/lobby/:id/ready` - Toggle ready status
-- `POST /api/lobby/:id/start` - Start game (host only)
+## API Reference
 
-### Game
-- `GET /api/game/:id` - Get public game state
-- `GET /api/game/:id/player/:faction` - Get player-specific state
-- `POST /api/game/:id/orders` - Submit orders
-- `POST /api/game/:id/retreats` - Submit retreat orders
-- `POST /api/game/:id/builds` - Submit build/disband orders
-- `GET /api/game/:id/history` - Get turn history
+### Lobby Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/lobby/create` | Create new game lobby |
+| GET | `/api/lobby/:id` | Get lobby info |
+| POST | `/api/lobby/:id/join` | Join lobby |
+| POST | `/api/lobby/:id/select-faction` | Choose faction |
+| POST | `/api/lobby/:id/ready` | Toggle ready status |
+| POST | `/api/lobby/:id/start` | Start game (host only) |
 
-### Alliances
-- `POST /api/game/:id/alliance/propose` - Propose alliance
-- `POST /api/game/:id/alliance/respond` - Accept/reject proposal
+### Game Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/game/:id` | Get public game state |
+| GET | `/api/game/:id/player/:faction` | Get player-specific state |
+| POST | `/api/game/:id/orders` | Submit orders |
+| POST | `/api/game/:id/retreats` | Submit retreat orders |
+| POST | `/api/game/:id/builds` | Submit build/disband orders |
 
-## Deployment (Railway)
+### WebSocket Events
+- `player_joined` - Player joined lobby
+- `faction_selected` - Faction selection changed
+- `game_started` - Game has started
+- `orders_submitted` - Player submitted orders
+- `turn_resolved` - Turn resolution complete
+- `message_received` - New chat message
 
-1. Create Railway project
-2. Add PostgreSQL addon (optional, for persistence)
-3. Deploy backend service from `/backend`
-4. Deploy frontend as static site from `/frontend`
-5. Set environment variables:
-   - `FRONTEND_URL` on backend
-   - `VITE_API_URL` on frontend
+---
 
-## Development Notes
+## Deployment
 
-### Balance Testing
-The game has been extensively tested with AI simulations:
-- 1000+ games simulated
-- ~15% standard deviation across factions
-- 63.5% of games end in allied victory
-- Breen is "Turkey-style" kingmaker (hard to attack, hard to win solo)
+### Railway (Recommended)
 
-### TODO
+1. Create a Railway project at [railway.app](https://railway.app)
+2. Connect your GitHub repository
+3. Add two services:
+   - **Backend**: Root directory = `/backend`
+   - **Frontend**: Root directory = `/frontend`
+4. Set environment variables:
+   - Backend: `PORT=3001`, `FRONTEND_URL=https://your-frontend.railway.app`
+   - Frontend: `VITE_API_URL=https://your-backend.railway.app`
+
+### Other Platforms
+Works with any Node.js hosting (Render, Fly.io, Heroku, etc.)
+
+---
+
+## Tech Stack
+
+- **Backend**: Node.js, Express, Socket.io, SQLite
+- **Frontend**: React 18, Vite, Tailwind CSS, Zustand
+- **Testing**: Jest, Selenium WebDriver
+
+---
+
+## Development Status
+
+### Completed
+- [x] Core game engine with order resolution
+- [x] 7 faction abilities with unique mechanics
+- [x] Alliance system with shared victory
+- [x] In-game messaging
+- [x] SQLite persistence
+- [x] Real-time updates via WebSocket
+- [x] Comprehensive E2E test suite (272 tests)
+
+### Planned
 - [ ] 3D map visualization (Three.js)
-- [ ] Private messaging system
-- [ ] Turn timers
-- [ ] Game persistence (database)
+- [ ] Turn timers with auto-resolution
 - [ ] Spectator mode
-- [ ] Tutorial
+- [ ] Game replays
+- [ ] Mobile optimization
+
+---
 
 ## License
 
