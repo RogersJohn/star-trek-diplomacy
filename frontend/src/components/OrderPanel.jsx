@@ -50,7 +50,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
   };
 
   return (
-    <div className="order-panel">
+    <div className="order-panel" data-testid="order-panel">
       {/* Disabled overlay for eliminated players */}
       {disabled && (
         <div className="absolute inset-0 bg-black/50 z-30 flex items-center justify-center">

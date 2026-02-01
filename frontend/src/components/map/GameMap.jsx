@@ -180,7 +180,7 @@ export default function GameMap({ gameState, faction }) {
   })
   
   return (
-    <div className="map-container relative w-full h-full">
+    <div className="map-container relative w-full h-full" data-testid="game-map">
       {/* View Mode Toggle */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <button

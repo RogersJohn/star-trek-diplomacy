@@ -1,0 +1,26 @@
+{
+  "name": "star-trek-diplomacy-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive Selenium test suite for Star Trek Diplomacy",
+  "scripts": {
+    "test": "jest --runInBand --testTimeout=120000",
+    "test:auth": "jest --runInBand --testTimeout=120000 auth.test.js",
+    "test:lobby": "jest --runInBand --testTimeout=120000 lobby.test.js",
+    "test:orders": "jest --runInBand --testTimeout=120000 orders.test.js",
+    "test:resolution": "jest --runInBand --testTimeout=120000 resolution.test.js",
+    "test:abilities": "jest --runInBand --testTimeout=120000 abilities.test.js",
+    "test:alliances": "jest --runInBand --testTimeout=120000 alliances.test.js",
+    "test:messaging": "jest --runInBand --testTimeout=120000 messaging.test.js",
+    "test:ui": "jest --runInBand --testTimeout=120000 ui.test.js",
+    "test:victory": "jest --runInBand --testTimeout=120000 victory.test.js",
+    "test:edge": "jest --runInBand --testTimeout=120000 edge-cases.test.js",
+    "test:quick": "node multiplayer-test.js",
+    "test:smoke": "jest --runInBand --testTimeout=120000 --testPathPattern=smoke"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.27.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

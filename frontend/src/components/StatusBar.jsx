@@ -12,7 +12,7 @@ export default function StatusBar({ gameState, myState, faction }) {
   const victoryThreshold = Math.ceil(totalSC / 2)
   
   return (
-    <div className="bg-space-blue border-b-4 border-lcars-orange px-4 py-2">
+    <div className="bg-space-blue border-b-4 border-lcars-orange px-4 py-2" data-testid="status-bar">
       <div className="flex items-center justify-between">
         {/* Turn Info */}
         <div className="flex items-center gap-6">
