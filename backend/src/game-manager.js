@@ -162,6 +162,8 @@ class GameManager {
 
     // Validate each order
     const validator = new OrderValidator(this.state);
+    // Pass frozen territories to validator (Phase 2 - Breen)
+    validator.setFrozenTerritories(this.abilities.frozenTerritories);
     const validatedOrders = [];
     const errors = [];
 
@@ -213,6 +215,11 @@ class GameManager {
    * Resolve order phase
    */
   resolveOrders() {
+    // Trigger Romulan intelligence (Phase 4)
+    if (this.playerFactions['romulan'] && !this.state.isEliminated('romulan')) {
+      this.abilities.useIntelligence(this.pendingOrders);
+    }
+
     // Apply Klingon bonuses/penalties
     Object.values(this.pendingOrders)
       .flat()
@@ -228,13 +235,24 @@ class GameManager {
 
     // Adjudicate
     const adjudicator = new Adjudicator(this.state);
+
+    // Pass ability data to adjudicator
+    adjudicator.setProtectedLocations(this.abilities.getProtectedLocations());
+    adjudicator.setSabotagedSupports(this.abilities.getSabotagedSupports());
+
     adjudicator.setOrders(this.pendingOrders);
     const results = adjudicator.adjudicate();
 
-    // Apply Gorn resilience
+    // Apply Gorn resilience - triggers for ALL dislodged Gorn units
+    const survivalRolls = [];
     Object.entries(this.state.dislodged).forEach(([location, dislodged]) => {
-      if (dislodged.retreatOptions.length === 0 && dislodged.faction === 'gorn') {
+      if (dislodged.faction === 'gorn') {
         const resilience = this.abilities.checkGornResilience('gorn', location);
+        survivalRolls.push({
+          location,
+          survived: resilience.survived,
+          returnTo: resilience.returnTo
+        });
         if (resilience.survived) {
           this.state.units[resilience.returnTo] = {
             faction: 'gorn',
@@ -250,12 +268,13 @@ class GameManager {
       }
     });
 
-    // Record in history
+    // Record in history (including Gorn survival rolls)
     this.history.push({
       turn: this.state.turn,
       season: this.state.season,
       orders: JSON.parse(JSON.stringify(this.pendingOrders)),
       results,
+      survivalRolls: survivalRolls.length > 0 ? survivalRolls : undefined,
     });
 
     // Clear pending orders
@@ -323,8 +342,22 @@ class GameManager {
       });
     });
 
-    // Disband any remaining dislodged
-    Object.keys(this.state.dislodged).forEach(loc => {
+    // Disband any remaining dislodged (check Gorn resilience first)
+    Object.entries(this.state.dislodged).forEach(([loc, dislodged]) => {
+      if (dislodged.faction === 'gorn') {
+        const resilience = this.abilities.checkGornResilience('gorn', loc);
+        if (resilience.survived) {
+          this.state.units[resilience.returnTo] = {
+            faction: 'gorn',
+            type: dislodged.type,
+          };
+          results.push({
+            type: 'gorn_survived',
+            from: loc,
+            to: resilience.returnTo,
+          });
+        }
+      }
       handler.disbandDislodged(loc);
     });
 
@@ -542,7 +575,10 @@ class GameManager {
         return this.abilities.freezeTerritory(params.location);
 
       case 'bribe':
-        return this.abilities.bribeNeutralSC(params.location, { systems: SYSTEMS });
+        return this.abilities.bribeNeutralSC(params.location, {
+          systems: SYSTEMS,
+          ownership: this.state.ownership
+        });
 
       case 'sabotage':
         return this.abilities.sabotageSupport(params.targetFaction, params.targetLocation);

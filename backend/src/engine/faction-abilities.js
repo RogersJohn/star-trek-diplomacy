@@ -122,15 +122,23 @@ class AbilityManager {
         this.usedAbilities = {};
         this.frozenTerritories = [];
         this.revealedOrders = [];
+        this.protectedLocations = [];
+        this.sabotagedSupports = [];
     }
     
     // Federation: Prevent dislodge
     useDiplomaticImmunity(faction, location) {
         if (faction !== 'federation') return { success: false, reason: 'Not Federation' };
         if (this.usedAbilities['federation_immunity']) return { success: false, reason: 'Already used' };
-        
+
         this.usedAbilities['federation_immunity'] = true;
+        this.protectedLocations.push(location);
         return { success: true, protectedLocation: location };
+    }
+
+    // Get protected locations for adjudicator
+    getProtectedLocations() {
+        return this.protectedLocations;
     }
     
     // Klingon: Glass cannon (applied during adjudication)
@@ -188,9 +196,15 @@ class AbilityManager {
         if (!this.economy.canAfford('ferengi', cost)) {
             return { success: false, reason: 'Insufficient latinum' };
         }
-        
+
         this.economy.spend('ferengi', cost, `Sabotaged support at ${targetLocation}`);
+        this.sabotagedSupports.push({ faction: targetFaction, location: targetLocation });
         return { success: true, targetFaction, targetLocation };
+    }
+
+    // Get sabotaged supports for adjudicator
+    getSabotagedSupports() {
+        return this.sabotagedSupports;
     }
     
     // Breen: Freeze territory
@@ -232,6 +246,8 @@ class AbilityManager {
     resetTurn() {
         this.frozenTerritories = [];
         this.revealedOrders = [];
+        this.protectedLocations = [];
+        this.sabotagedSupports = [];
     }
     
     // Reset per-year abilities

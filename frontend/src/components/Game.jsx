@@ -21,7 +21,7 @@ export default function Game() {
   // Handle faction ability usage
   const handleUseAbility = async (abilityName, params) => {
     try {
-      const response = await fetch(`/api/games/${gameId}/ability`, {
+      const response = await fetch(`/api/game/${gameId}/ability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ faction: selectedFaction, ability: abilityName, params }),
@@ -45,7 +45,7 @@ export default function Game() {
   // Handle alliance proposal
   const handleProposeAlliance = async (from, to, type) => {
     try {
-      const response = await fetch(`/api/games/${gameId}/alliance/propose`, {
+      const response = await fetch(`/api/game/${gameId}/alliance/propose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from, to, type }),
@@ -68,7 +68,7 @@ export default function Game() {
   // Handle alliance response
   const handleRespondToProposal = async (proposalId, faction, accept) => {
     try {
-      const response = await fetch(`/api/games/${gameId}/alliance/respond`, {
+      const response = await fetch(`/api/game/${gameId}/alliance/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proposalId, faction, accept }),
@@ -91,7 +91,7 @@ export default function Game() {
   // Handle break alliance
   const handleBreakAlliance = async (faction) => {
     try {
-      const response = await fetch(`/api/games/${gameId}/alliance/break`, {
+      const response = await fetch(`/api/game/${gameId}/alliance/break`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ faction }),

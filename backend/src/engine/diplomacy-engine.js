@@ -254,32 +254,46 @@ class GameState {
 class OrderValidator {
     constructor(state) {
         this.state = state;
+        this.frozenTerritories = [];
     }
-    
+
+    // Set territories frozen by Breen ability
+    setFrozenTerritories(territories) {
+        this.frozenTerritories = territories || [];
+    }
+
     validateOrder(order) {
         const unit = this.state.units[order.location];
         if (!unit) return { valid: false, reason: 'No unit at location' };
         if (unit.faction !== order.faction) return { valid: false, reason: 'Unit belongs to different faction' };
-        
+
         switch (order.type) {
             case ORDER_TYPES.HOLD:
                 return { valid: true };
-                
+
             case ORDER_TYPES.MOVE:
                 if (!isAdjacent(order.location, order.destination)) {
                     return { valid: false, reason: 'Destination not adjacent' };
                 }
+                // Check Breen freeze - cannot move out of frozen territory
+                if (this.frozenTerritories.includes(order.location)) {
+                    return { valid: false, reason: 'Territory is frozen - cannot move out' };
+                }
+                // Check Breen freeze - cannot move into frozen territory
+                if (this.frozenTerritories.includes(order.destination)) {
+                    return { valid: false, reason: 'Territory is frozen - cannot move in' };
+                }
                 return { valid: true };
-                
+
             case ORDER_TYPES.SUPPORT:
                 if (!isAdjacent(order.location, order.supportTo)) {
                     return { valid: false, reason: 'Cannot support non-adjacent location' };
                 }
                 return { valid: true };
-                
+
             case ORDER_TYPES.CONVOY:
                 return { valid: true };
-                
+
             default:
                 return { valid: false, reason: 'Unknown order type' };
         }
@@ -294,8 +308,10 @@ class Adjudicator {
         this.state = state;
         this.orders = [];
         this.results = [];
+        this.protectedLocations = [];
+        this.sabotagedSupports = [];
     }
-    
+
     setOrders(ordersByFaction) {
         this.orders = [];
         Object.entries(ordersByFaction).forEach(([faction, orders]) => {
@@ -303,6 +319,23 @@ class Adjudicator {
                 this.orders.push({ ...order, faction });
             });
         });
+    }
+
+    // Set locations protected by Federation Diplomatic Immunity
+    setProtectedLocations(locations) {
+        this.protectedLocations = locations || [];
+    }
+
+    // Set supports sabotaged by Ferengi
+    setSabotagedSupports(sabotaged) {
+        this.sabotagedSupports = sabotaged || [];
+    }
+
+    // Check if a support is sabotaged
+    isSupportSabotaged(support) {
+        return this.sabotagedSupports.some(
+            s => s.faction === support.faction && s.location === support.location
+        );
     }
     
     adjudicate() {
@@ -321,14 +354,16 @@ class Adjudicator {
             
             // Count valid supports
             supports.forEach(support => {
-                if (support.supportFrom === move.location && 
+                if (support.supportFrom === move.location &&
                     support.supportTo === move.destination) {
                     // Check if support is cut
-                    const supportCut = moves.some(m => 
-                        m.destination === support.location && 
+                    const supportCut = moves.some(m =>
+                        m.destination === support.location &&
                         m.faction !== support.faction
                     );
-                    if (!supportCut) {
+                    // Check if support is sabotaged by Ferengi
+                    const sabotaged = this.isSupportSabotaged(support);
+                    if (!supportCut && !sabotaged) {
                         strength++;
                     }
                 }
@@ -364,11 +399,13 @@ class Adjudicator {
                 // Add supports for hold
                 supports.forEach(support => {
                     if (support.supportTo === destination && !support.supportFrom) {
-                        const supportCut = moves.some(m => 
-                            m.destination === support.location && 
+                        const supportCut = moves.some(m =>
+                            m.destination === support.location &&
                             m.faction !== support.faction
                         );
-                        if (!supportCut) defenseStrength++;
+                        // Check if support is sabotaged by Ferengi
+                        const sabotaged = this.isSupportSabotaged(support);
+                        if (!supportCut && !sabotaged) defenseStrength++;
                     }
                 });
             }
@@ -379,15 +416,27 @@ class Adjudicator {
                 const attackStrength = moveStrengths.get(key)?.strength || 1;
                 
                 if (attackStrength > defenseStrength) {
-                    successfulMoves.push(move);
-                    if (defender) {
-                        this.state.dislodged[destination] = {
-                            ...defender,
-                            retreatOptions: getAdjacent(destination).filter(loc => 
-                                !this.state.units[loc] && 
-                                loc !== move.location
-                            )
-                        };
+                    // Check if defender is protected by Diplomatic Immunity
+                    const isProtected = this.protectedLocations.includes(destination);
+                    if (isProtected) {
+                        // Move fails - defender protected
+                        failedMoves.push(move);
+                        this.results.push({
+                            type: 'diplomatic_immunity',
+                            location: destination,
+                            attackingFaction: move.faction
+                        });
+                    } else {
+                        successfulMoves.push(move);
+                        if (defender) {
+                            this.state.dislodged[destination] = {
+                                ...defender,
+                                retreatOptions: getAdjacent(destination).filter(loc =>
+                                    !this.state.units[loc] &&
+                                    loc !== move.location
+                                )
+                            };
+                        }
                     }
                 } else {
                     failedMoves.push(move);
@@ -409,15 +458,27 @@ class Adjudicator {
                 });
                 
                 if (winners.length === 1 && maxStrength > defenseStrength) {
-                    successfulMoves.push(winners[0]);
-                    competingMoves.filter(m => m !== winners[0]).forEach(m => failedMoves.push(m));
-                    if (defender) {
-                        this.state.dislodged[destination] = {
-                            ...defender,
-                            retreatOptions: getAdjacent(destination).filter(loc => 
-                                !this.state.units[loc]
-                            )
-                        };
+                    // Check if defender is protected by Diplomatic Immunity
+                    const isProtected = this.protectedLocations.includes(destination);
+                    if (isProtected) {
+                        // All moves fail - defender protected
+                        competingMoves.forEach(m => failedMoves.push(m));
+                        this.results.push({
+                            type: 'diplomatic_immunity',
+                            location: destination,
+                            attackingFaction: winners[0].faction
+                        });
+                    } else {
+                        successfulMoves.push(winners[0]);
+                        competingMoves.filter(m => m !== winners[0]).forEach(m => failedMoves.push(m));
+                        if (defender) {
+                            this.state.dislodged[destination] = {
+                                ...defender,
+                                retreatOptions: getAdjacent(destination).filter(loc =>
+                                    !this.state.units[loc]
+                                )
+                            };
+                        }
                     }
                 } else {
                     // Standoff - all fail
