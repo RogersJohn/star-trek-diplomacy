@@ -15,7 +15,7 @@ const {
   VICTORY_CONDITIONS,
   getAdjacent,
 } = require('./engine/diplomacy-engine');
-const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('../../shared/map-data');
+const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('./engine/map-data');
 const { LatinumEconomy, AbilityManager, FACTION_ABILITIES } = require('./engine/faction-abilities');
 const { AllianceManager } = require('./engine/alliance-system');
 const { saveGame, saveTurn, saveOrder, saveMessage, loadGame, getActiveGames } = require('./database');

@@ -55,5 +55,5 @@ ENV CHROME_TEMP_DIR=/tmp/chrome-test
 # Create temp directory for Chrome
 RUN mkdir -p /tmp/chrome-test && chmod 777 /tmp/chrome-test
 
-# Run tests
+# Default: run all tests (can be overridden)
 CMD ["npm", "test"]

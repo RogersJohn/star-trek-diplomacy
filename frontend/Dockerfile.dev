@@ -1,4 +1,5 @@
 # Development Dockerfile for frontend
+# Build context should be project root to include shared folder
 FROM node:18-alpine
 
 # Install wget for healthcheck
@@ -6,14 +7,17 @@ RUN apk add --no-cache wget
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy shared folder to parent directory (frontend imports from ../../../../shared/)
+COPY shared/ /shared/
+
+# Copy frontend package files
+COPY frontend/package*.json ./
 
 # Install all dependencies
 RUN npm ci
 
-# Copy source code
-COPY . .
+# Copy frontend source code
+COPY frontend/ ./
 
 # Expose Vite development port
 EXPOSE 5173

@@ -1,21 +1,19 @@
 # Docker Compose configuration for running E2E tests
 # Usage: docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
 
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-    ports:
-      - "3001:3001"
+    # Ports not exposed externally - only internal Docker network needed
+    expose:
+      - "3001"
     environment:
       - PORT=3001
       - NODE_ENV=test
       - DEV_MODE=true
-    volumes:
-      - ./backend/src:/app/src:ro
+      - FRONTEND_URL=http://frontend:5173
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 5s
@@ -25,10 +23,11 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "5173:5173"
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    # Ports not exposed externally - only internal Docker network needed
+    expose:
+      - "5173"
     environment:
       - VITE_API_URL=http://backend:3001
       - VITE_DEV_MODE=true
@@ -58,3 +57,5 @@ services:
     volumes:
       - ./tests/screenshots:/app/tests/screenshots
     shm_size: '2gb'
+    # Default: smoke tests. For full suite: docker-compose -f docker-compose.test.yml run tests npm test
+    command: ["npm", "test", "--", "--testPathPattern=smoke"]
