@@ -190,6 +190,55 @@ router.post('/:gameId/ability', (req, res) => {
   res.json(result);
 });
 
+// Check deadline and identify delinquent players
+router.post('/:gameId/check-deadline', (req, res) => {
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const result = game.checkDeadline();
+  game.saveToDatabase();
+
+  // Notify all players if deadline expired
+  if (result.expired) {
+    const io = req.app.get('io');
+    io.to(`game:${req.params.gameId}`).emit('deadline_expired', {
+      delinquentPlayers: result.delinquentPlayers
+    });
+  }
+
+  res.json(result);
+});
+
+// Vote to kick a delinquent player
+router.post('/:gameId/vote-kick', (req, res) => {
+  const game = games.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const { votingFaction, targetFaction } = req.body;
+
+  if (!votingFaction || !targetFaction) {
+    return res.status(400).json({ error: 'Missing faction parameters' });
+  }
+
+  const result = game.initiateKickVote(targetFaction, votingFaction);
+  game.saveToDatabase();
+
+  // Emit socket event for real-time update
+  const io = req.app.get('io');
+  io.to(`game:${req.params.gameId}`).emit('kick_vote_update', {
+    targetFaction,
+    votes: game.kickVotes[targetFaction] || [],
+    kicked: result.kicked || false,
+    kickedPlayers: game.kickedPlayers
+  });
+
+  res.json(result);
+});
+
 // Export for use in main server
 module.exports = router;
 

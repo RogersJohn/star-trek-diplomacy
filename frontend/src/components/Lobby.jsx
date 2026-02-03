@@ -21,6 +21,7 @@ export default function Lobby() {
   const [selectedFaction, setSelectedFaction] = useState(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState('')
+  const [turnTimerDays, setTurnTimerDays] = useState(3)
   
   useEffect(() => {
     connect()
@@ -39,6 +40,7 @@ export default function Lobby() {
       socket.on('player_left', fetchLobby)
       socket.on('faction_selected', fetchLobby)
       socket.on('player_ready_changed', fetchLobby)
+      socket.on('settings_updated', fetchLobby)
       socket.on('game_started', ({ gameId }) => {
         // Store faction in localStorage so Game component can retrieve it
         if (selectedFaction) {
@@ -52,6 +54,7 @@ export default function Lobby() {
         socket.off('player_left')
         socket.off('faction_selected')
         socket.off('player_ready_changed')
+        socket.off('settings_updated')
         socket.off('game_started')
       }
     }
@@ -66,12 +69,17 @@ export default function Lobby() {
         setError(data.error)
       } else {
         setLobby(data)
-        
+
         // Find my current selection
         const me = data.players.find(p => p.name === playerName)
         if (me) {
           setSelectedFaction(me.faction)
           setIsReady(me.ready)
+        }
+
+        // Update turn timer from lobby settings
+        if (data.settings?.turnTimerDays) {
+          setTurnTimerDays(data.settings.turnTimerDays)
         }
       }
     } catch (err) {
@@ -121,13 +129,34 @@ export default function Lobby() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       const data = await res.json()
       if (!data.success) {
         setError(data.error)
       }
     } catch (err) {
       setError('Failed to start game')
+    }
+  }
+
+  const handleUpdateSettings = async (newSettings) => {
+    try {
+      const res = await fetch(`/api/lobby/${lobbyId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        if (newSettings.turnTimerDays) {
+          setTurnTimerDays(newSettings.turnTimerDays)
+        }
+      } else {
+        setError(data.error)
+      }
+    } catch (err) {
+      setError('Failed to update settings')
     }
   }
   
@@ -252,28 +281,63 @@ export default function Lobby() {
             })}
           </div>
           
+          {/* Game Settings (Host Only) */}
+          {isHost && lobby.status === 'waiting' && (
+            <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+              <h3 className="text-lcars-tan text-sm font-bold mb-2">Game Settings</h3>
+              <label className="block text-gray-400 text-xs mb-1">
+                Turn Timer (days per turn)
+              </label>
+              <select
+                value={turnTimerDays}
+                onChange={(e) => handleUpdateSettings({ turnTimerDays: parseInt(e.target.value) })}
+                className="w-full bg-space-dark text-white border border-lcars-orange rounded px-3 py-2 text-sm"
+              >
+                <option value="1">1 day</option>
+                <option value="2">2 days</option>
+                <option value="3">3 days (default)</option>
+                <option value="5">5 days</option>
+                <option value="7">7 days</option>
+                <option value="0">No timer</option>
+              </select>
+              <p className="text-gray-500 text-xs mt-1">
+                Players who miss the deadline can be voted to kick
+              </p>
+            </div>
+          )}
+
+          {/* Show current timer setting (non-host) */}
+          {!isHost && lobby.settings?.turnTimerDays > 0 && (
+            <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+              <span className="text-gray-400 text-xs">Turn Timer: </span>
+              <span className="text-lcars-orange text-sm font-bold">
+                {lobby.settings.turnTimerDays} day{lobby.settings.turnTimerDays !== 1 ? 's' : ''} per turn
+              </span>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="space-y-3">
             {selectedFaction && (
               <button
                 onClick={handleToggleReady}
                 className={`w-full py-3 rounded font-bold transition-colors
-                  ${isReady 
-                    ? 'bg-green-600 hover:bg-green-700' 
+                  ${isReady
+                    ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-lcars-orange hover:bg-lcars-tan text-black'
                   }`}
               >
                 {isReady ? '✓ READY' : 'MARK READY'}
               </button>
             )}
-            
+
             {isHost && (
               <button
                 onClick={handleStartGame}
                 disabled={!canStart}
                 className={`w-full py-3 rounded font-bold transition-colors
-                  ${canStart 
-                    ? 'bg-lcars-blue hover:bg-blue-400 text-black' 
+                  ${canStart
+                    ? 'bg-lcars-blue hover:bg-blue-400 text-black'
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                   }`}
               >

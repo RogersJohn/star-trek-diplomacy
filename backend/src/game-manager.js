@@ -53,6 +53,17 @@ class GameManager {
 
     // Messages
     this.messages = [];
+
+    // Turn timer state
+    this.turnDeadline = null;           // ISO timestamp when orders due
+    this.delinquentPlayers = [];        // Factions who missed deadline
+    this.kickVotes = {};                // { targetFaction: [votingFactions] }
+    this.kickedPlayers = [];            // Factions that have been kicked
+
+    // Set initial deadline for first turn if timer is configured
+    if (this.settings.turnTimerDays) {
+      this.turnDeadline = this.calculateDeadline();
+    }
   }
 
   /**
@@ -71,6 +82,12 @@ class GameManager {
       supplyCounts: this.getSupplyCounts(),
       ordersSubmitted: Object.keys(this.pendingOrders),
       winner: this.winner || null,
+      // Turn timer info
+      turnDeadline: this.turnDeadline,
+      turnTimerDays: this.settings.turnTimerDays || null,
+      delinquentPlayers: this.delinquentPlayers,
+      kickVotes: this.kickVotes,
+      kickedPlayers: this.kickedPlayers,
     };
   }
 
@@ -192,6 +209,13 @@ class GameManager {
     const activeFactions = Object.keys(this.playerFactions).filter(
       f => !this.state.isEliminated(f)
     );
+
+    // Auto-submit holds for kicked players who haven't submitted
+    activeFactions.forEach(f => {
+      if (this.kickedPlayers.includes(f) && !this.pendingOrders[f]) {
+        this.autoSubmitHolds(f);
+      }
+    });
 
     return activeFactions.every(f => this.pendingOrders[f]);
   }
@@ -450,6 +474,13 @@ class GameManager {
     this.phase = 'orders';
     this.abilities.resetTurn();
 
+    // Reset turn timer state
+    if (this.settings.turnTimerDays) {
+      this.turnDeadline = this.calculateDeadline();
+    }
+    this.delinquentPlayers = [];
+    this.kickVotes = {};
+
     return {
       phase: 'orders',
       turn: this.state.turn,
@@ -624,6 +655,113 @@ class GameManager {
   }
 
   /**
+   * Calculate deadline for current turn
+   */
+  calculateDeadline() {
+    const days = this.settings.turnTimerDays || 3; // Default 3 days
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() + days);
+    return deadline.toISOString();
+  }
+
+  /**
+   * Check if deadline has expired and identify delinquent players
+   */
+  checkDeadline() {
+    if (!this.turnDeadline || this.phase !== 'orders') {
+      return { expired: false };
+    }
+
+    const now = new Date();
+    const deadline = new Date(this.turnDeadline);
+
+    if (now > deadline) {
+      // Find players who haven't submitted
+      const activeFactions = Object.keys(this.playerFactions)
+        .filter(f => !this.state.isEliminated(f) && !this.kickedPlayers.includes(f));
+
+      const delinquent = activeFactions.filter(f => !this.pendingOrders[f]);
+      this.delinquentPlayers = delinquent;
+
+      return { expired: true, delinquentPlayers: delinquent };
+    }
+
+    return { expired: false, deadline: this.turnDeadline };
+  }
+
+  /**
+   * Vote to kick a delinquent player
+   */
+  initiateKickVote(targetFaction, votingFaction) {
+    // Can only vote to kick delinquent players
+    if (!this.delinquentPlayers.includes(targetFaction)) {
+      return { success: false, reason: 'Player is not delinquent' };
+    }
+
+    // Can't vote if you're kicked or eliminated
+    if (this.kickedPlayers.includes(votingFaction) ||
+        this.state.isEliminated(votingFaction)) {
+      return { success: false, reason: 'You cannot vote' };
+    }
+
+    // Can't vote to kick yourself
+    if (targetFaction === votingFaction) {
+      return { success: false, reason: 'You cannot vote to kick yourself' };
+    }
+
+    // Initialize vote array if needed
+    if (!this.kickVotes[targetFaction]) {
+      this.kickVotes[targetFaction] = [];
+    }
+
+    // Add vote if not already voted
+    if (!this.kickVotes[targetFaction].includes(votingFaction)) {
+      this.kickVotes[targetFaction].push(votingFaction);
+    }
+
+    // Check if unanimous (all active non-target players must vote)
+    const eligibleVoters = Object.keys(this.playerFactions)
+      .filter(f => f !== targetFaction &&
+                   !this.state.isEliminated(f) &&
+                   !this.kickedPlayers.includes(f));
+
+    const allVoted = eligibleVoters.every(f =>
+      this.kickVotes[targetFaction].includes(f)
+    );
+
+    if (allVoted && eligibleVoters.length > 0) {
+      this.kickedPlayers.push(targetFaction);
+      return {
+        success: true,
+        kicked: true,
+        player: targetFaction,
+        message: `${targetFaction} has been kicked from the game`
+      };
+    }
+
+    return {
+      success: true,
+      kicked: false,
+      votes: this.kickVotes[targetFaction].length,
+      needed: eligibleVoters.length
+    };
+  }
+
+  /**
+   * Auto-submit hold orders for a faction (used for kicked players)
+   */
+  autoSubmitHolds(faction) {
+    const units = this.state.getUnits(faction);
+    const holdOrders = units.map(unit => ({
+      type: 'hold',
+      location: unit.location,
+      faction: faction
+    }));
+
+    this.pendingOrders[faction] = holdOrders;
+  }
+
+  /**
    * Serialize game state for storage
    */
   toJSON() {
@@ -644,6 +782,11 @@ class GameManager {
       turn: this.state.turn,
       year: this.state.year,
       season: this.state.season,
+      // Turn timer state
+      turnDeadline: this.turnDeadline,
+      delinquentPlayers: this.delinquentPlayers,
+      kickVotes: this.kickVotes,
+      kickedPlayers: this.kickedPlayers,
     };
   }
 
@@ -686,6 +829,12 @@ class GameManager {
     game.history = data.history;
     game.messages = data.messages || [];
     game.winner = data.winner;
+
+    // Restore turn timer state
+    game.turnDeadline = data.turnDeadline || null;
+    game.delinquentPlayers = data.delinquentPlayers || [];
+    game.kickVotes = data.kickVotes || {};
+    game.kickedPlayers = data.kickedPlayers || [];
 
     return game;
   }

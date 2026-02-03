@@ -201,6 +201,29 @@ router.post('/:lobbyId/start', (req, res) => {
   res.json({ success: true, gameId });
 });
 
+// Update lobby settings (host only)
+router.post('/:lobbyId/settings', (req, res) => {
+  const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!lobby) {
+    return res.status(404).json({ error: 'Lobby not found' });
+  }
+
+  // Only allow updating settings when game hasn't started
+  if (lobby.status !== 'waiting') {
+    return res.status(400).json({ error: 'Cannot change settings after game started' });
+  }
+
+  // Merge new settings
+  lobby.settings = { ...lobby.settings, ...req.body };
+
+  // Notify via WebSocket
+  const io = req.app.get('io');
+  io.to(`lobby:${req.params.lobbyId}`).emit('settings_updated', lobby.settings);
+
+  res.json({ success: true, settings: lobby.settings });
+});
+
 // Get lobby info
 router.get('/:lobbyId', (req, res) => {
   const lobby = lobbies.get(req.params.lobbyId);

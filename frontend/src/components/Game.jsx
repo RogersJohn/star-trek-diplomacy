@@ -17,6 +17,7 @@ export default function Game() {
   const [selectedFaction, setSelectedFaction] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
+  const [kickVoteTarget, setKickVoteTarget] = useState(null);
 
   // Handle faction ability usage
   const handleUseAbility = async (abilityName, params) => {
@@ -112,6 +113,46 @@ export default function Game() {
     }
   };
 
+  // Handle vote to kick delinquent player
+  const handleVoteKick = async (targetFaction) => {
+    try {
+      const response = await fetch(`/api/game/${gameId}/vote-kick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          votingFaction: selectedFaction,
+          targetFaction,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.kicked) {
+        alert(`${FACTION_NAMES[targetFaction]} has been kicked from the game.`);
+      }
+
+      fetchGameState();
+    } catch (error) {
+      console.error('Vote kick failed:', error);
+      alert('Failed to submit kick vote');
+    }
+  };
+
+  // Check deadline status
+  const handleCheckDeadline = async () => {
+    try {
+      const response = await fetch(`/api/game/${gameId}/check-deadline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      await response.json();
+      fetchGameState();
+    } catch (error) {
+      console.error('Check deadline failed:', error);
+    }
+  };
+
   useEffect(() => {
     connect();
 
@@ -140,6 +181,21 @@ export default function Game() {
       setIsEliminated(eliminated);
     }
   }, [gameState, selectedFaction]);
+
+  // Periodically check deadline during orders phase
+  useEffect(() => {
+    if (gameState?.phase === 'orders' && gameState?.turnDeadline) {
+      // Check deadline every minute
+      const interval = setInterval(() => {
+        handleCheckDeadline();
+      }, 60000);
+
+      // Initial check
+      handleCheckDeadline();
+
+      return () => clearInterval(interval);
+    }
+  }, [gameState?.phase, gameState?.turnDeadline, gameId]);
 
   if (!gameState) {
     return (
@@ -280,6 +336,86 @@ export default function Game() {
             onRespondToProposal={handleRespondToProposal}
             onBreakAlliance={handleBreakAlliance}
           />
+        </div>
+      )}
+
+      {/* Delinquent Player Alert & Kick Vote UI */}
+      {gameState?.delinquentPlayers?.length > 0 && !gameState?.winner && (
+        <div className="px-4 pt-4">
+          <div className="bg-red-900/80 border-2 border-red-500 rounded-lg p-4">
+            <h3 className="text-red-200 font-bold mb-2 flex items-center gap-2">
+              <span className="animate-pulse">⚠</span> Deadline Passed
+            </h3>
+            <p className="text-red-100 text-sm mb-3">
+              The following players have not submitted orders:
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {gameState.delinquentPlayers.map((faction) => (
+                <span
+                  key={faction}
+                  className="px-3 py-1 rounded text-sm font-bold text-white"
+                  style={{ backgroundColor: FACTION_COLORS[faction] }}
+                >
+                  {FACTION_NAMES[faction]}
+                  {gameState.kickedPlayers?.includes(faction) && ' (Kicked)'}
+                </span>
+              ))}
+            </div>
+
+            {/* Kick Vote UI - only show if player can vote */}
+            {selectedFaction &&
+              !gameState.kickedPlayers?.includes(selectedFaction) &&
+              !gameState.eliminated?.includes(selectedFaction) && (
+                <div className="bg-gray-800/50 rounded-lg p-3 mt-3">
+                  <h4 className="text-lcars-tan text-sm font-bold mb-2">Vote to Kick</h4>
+                  {gameState.delinquentPlayers
+                    .filter((f) => !gameState.kickedPlayers?.includes(f))
+                    .map((faction) => {
+                      const votes = gameState.kickVotes?.[faction] || [];
+                      const hasVoted = votes.includes(selectedFaction);
+                      const isSelf = faction === selectedFaction;
+
+                      return (
+                        <div
+                          key={faction}
+                          className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
+                        >
+                          <span className="font-bold" style={{ color: FACTION_COLORS[faction] }}>
+                            {FACTION_NAMES[faction]}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-400 text-sm">{votes.length} vote(s)</span>
+                            {!isSelf && !hasVoted && (
+                              <button
+                                onClick={() => handleVoteKick(faction)}
+                                className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded font-bold"
+                              >
+                                Vote Kick
+                              </button>
+                            )}
+                            {hasVoted && <span className="text-green-400 text-sm">✓ Voted</span>}
+                            {isSelf && (
+                              <span className="text-gray-500 text-sm italic">Cannot vote</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  <p className="text-gray-500 text-xs mt-2">
+                    Kick requires unanimous vote from all active players
+                  </p>
+                </div>
+              )}
+          </div>
+        </div>
+      )}
+
+      {/* Kicked Player Banner */}
+      {gameState?.kickedPlayers?.includes(selectedFaction) && (
+        <div className="bg-orange-900 border-b-2 border-orange-500 px-4 py-2 text-center">
+          <span className="text-orange-200 font-bold">
+            ⚠ You have been kicked - Your units will auto-hold each turn
+          </span>
         </div>
       )}
 

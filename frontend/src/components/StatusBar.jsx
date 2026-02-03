@@ -1,4 +1,44 @@
+import { useState, useEffect } from 'react'
 import { FACTION_COLORS, FACTION_NAMES } from '../../../shared/map-data'
+
+function DeadlineCountdown({ deadline }) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date()
+      const end = new Date(deadline)
+      const diff = end - now
+
+      if (diff <= 0) {
+        setTimeLeft('EXPIRED')
+        return
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h`)
+      } else {
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+        setTimeLeft(`${hours}h ${mins}m`)
+      }
+    }
+
+    update()
+    const interval = setInterval(update, 60000) // Update every minute
+    return () => clearInterval(interval)
+  }, [deadline])
+
+  const isExpired = timeLeft === 'EXPIRED'
+
+  return (
+    <span className={isExpired ? 'text-red-500 font-bold animate-pulse' : 'text-lcars-orange'}>
+      {timeLeft}
+    </span>
+  )
+}
 
 export default function StatusBar({ gameState, myState, faction }) {
   const supplyCounts = gameState?.supplyCounts || {}
@@ -36,6 +76,13 @@ export default function StatusBar({ gameState, myState, faction }) {
               {gameState?.phase || 'Orders'}
             </span>
           </div>
+          {/* Deadline Display */}
+          {gameState?.turnDeadline && gameState?.phase === 'orders' && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400 text-sm">Deadline:</span>
+              <DeadlineCountdown deadline={gameState.turnDeadline} />
+            </div>
+          )}
         </div>
         
         {/* Your Faction */}
@@ -59,26 +106,27 @@ export default function StatusBar({ gameState, myState, faction }) {
         </span>
         {sortedFactions.map(([f, count], index) => {
           const isEliminated = gameState?.eliminated?.includes(f)
+          const isKicked = gameState?.kickedPlayers?.includes(f)
           const isLeading = index === 0 && count > 0
           const nearVictory = count >= victoryThreshold - 3 && count < victoryThreshold
-          
+
           return (
-            <div 
+            <div
               key={f}
               className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded transition-all ${
                 f === faction ? 'ring-2 ring-white bg-white/10' : ''
-              } ${isEliminated ? 'opacity-40' : ''} ${
+              } ${isEliminated ? 'opacity-40' : ''} ${isKicked ? 'opacity-60' : ''} ${
                 isLeading ? 'bg-yellow-500/20' : ''
               }`}
             >
-              <div 
+              <div
                 className={`w-3 h-3 rounded-full ${isLeading ? 'ring-2 ring-yellow-400 shadow-lg' : ''}`}
                 style={{ backgroundColor: FACTION_COLORS[f] }}
               />
               <span className="text-xs font-mono font-bold" style={{ color: FACTION_COLORS[f] }}>
                 {FACTION_NAMES[f].substring(0, 3).toUpperCase()}
               </span>
-              <span 
+              <span
                 className={`text-sm font-bold ${
                   nearVictory ? 'text-yellow-400' : 'text-white'
                 } ${isLeading ? 'text-yellow-300' : ''}`}
@@ -86,7 +134,8 @@ export default function StatusBar({ gameState, myState, faction }) {
                 {count}
               </span>
               {isEliminated && <span className="text-red-400 text-xs">✗</span>}
-              {isLeading && !isEliminated && <span className="text-yellow-400 text-xs">👑</span>}
+              {isKicked && !isEliminated && <span className="text-orange-400 text-xs" title="Kicked">⏸</span>}
+              {isLeading && !isEliminated && !isKicked && <span className="text-yellow-400 text-xs">👑</span>}
             </div>
           )
         })}
