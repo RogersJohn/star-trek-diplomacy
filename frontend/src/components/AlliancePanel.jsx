@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FACTION_COLORS, FACTION_NAMES } from '../../../../shared/map-data';
+import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared';
 
 const ALLIANCE_TYPES = {
   MUTUAL_DEFENSE: {

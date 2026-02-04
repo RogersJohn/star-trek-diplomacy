@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useGameStore } from '../../hooks/useGameStore'
-import { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS } from '../../../../shared/map-data'
+import { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS } from '@star-trek-diplomacy/shared'
 
 export default function GameMap({ gameState, faction }) {
   const { selectedUnit, selectUnit, addOrder, pendingOrders } = useGameStore()

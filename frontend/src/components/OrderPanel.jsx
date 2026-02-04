@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGameStore } from '../hooks/useGameStore';
-import { FACTION_NAMES, SYSTEMS } from '../../../../shared/map-data';
+import { FACTION_NAMES, SYSTEMS } from '@star-trek-diplomacy/shared';
 
 export default function OrderPanel({ gameState, myState, faction, disabled = false }) {
   const { pendingOrders, removeOrder, clearOrders, submitOrders, addOrder } = useGameStore();

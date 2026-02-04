@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@star-trek-diplomacy/shared": "*",
     "@clerk/clerk-react": "^5.60.0",
     "@react-three/drei": "^9.88.0",
     "@react-three/fiber": "^8.15.0",

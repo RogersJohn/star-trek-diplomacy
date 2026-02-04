@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGameStore } from '../hooks/useGameStore';
-import { FACTION_COLORS, FACTION_NAMES } from '../../../shared/map-data';
+import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared';
 import GameMap from './map/GameMap';
 import OrderPanel from './OrderPanel';
 import StatusBar from './StatusBar';

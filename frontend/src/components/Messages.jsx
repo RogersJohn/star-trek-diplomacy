@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../hooks/useGameStore'
-import { FACTION_COLORS, FACTION_NAMES } from '../../../shared/map-data'
+import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared'
 import MessageNotification from './MessageNotification'
 
 export default function Messages({ gameState, faction }) {

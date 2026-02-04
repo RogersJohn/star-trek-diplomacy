@@ -1,0 +1,9 @@
+{
+  "name": "@star-trek-diplomacy/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "map-data.js",
+  "exports": {
+    ".": "./map-data.js"
+  }
+}

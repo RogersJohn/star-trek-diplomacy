@@ -1,0 +1,17 @@
+{
+  "name": "star-trek-diplomacy",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "build": "npm run build --workspace=frontend",
+    "test": "npm test --workspace=backend"
+  }
+}
