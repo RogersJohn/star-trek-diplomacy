@@ -3,7 +3,7 @@
  *
  * Environment variables:
  *   BASE_URL     - Frontend URL (default: http://localhost:5173)
- *   API_URL      - Backend API URL (default: http://localhost:3001)
+ *   API_URL      - Backend API URL (default: http://localhost:3000)
  *   HEADLESS     - Run Chrome in headless mode (default: false)
  *   SELENIUM_HOST - Remote Selenium server (optional, for Docker)
  */
@@ -15,7 +15,7 @@ const path = require('path');
 
 // Configuration from environment variables
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
-const API_URL = process.env.API_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 const HEADLESS = process.env.HEADLESS === 'true' || process.env.HEADLESS === '1';
 const SELENIUM_HOST = process.env.SELENIUM_HOST || null;
 
