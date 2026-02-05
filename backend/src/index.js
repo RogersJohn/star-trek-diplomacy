@@ -4,6 +4,9 @@
  * Express server providing REST API and WebSocket support
  */
 
+// Load environment variables from .env file (for local development)
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -13,6 +16,7 @@ const lobbyRoutes = require('./api/lobby-routes');
 const userRoutes = require('./api/user-routes');
 const GameManager = require('./game-manager');
 const { games } = require('./api/game-routes');
+const { initializeDatabase, closeDatabase } = require('./database');
 
 const app = express();
 const server = http.createServer(app);
@@ -104,18 +108,51 @@ io.on('connection', socket => {
 // Make io accessible to routes
 app.set('io', io);
 
-// Load active games from database on startup
-console.log('Loading games from database...');
-const loadedGames = GameManager.loadActiveGames();
-loadedGames.forEach((game, gameId) => {
-  games.set(gameId, game);
-});
-console.log(`Loaded ${loadedGames.size} game(s) from database`);
-
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Star Trek Diplomacy server running on port ${PORT}`);
+// Async startup function
+async function startServer() {
+  try {
+    // Initialize database schema
+    console.log('Initializing database...');
+    await initializeDatabase();
+
+    // Load active games from database on startup
+    console.log('Loading games from database...');
+    const loadedGames = await GameManager.loadActiveGames();
+    loadedGames.forEach((game, gameId) => {
+      games.set(gameId, game);
+    });
+    console.log(`Loaded ${loadedGames.size} game(s) from database`);
+
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`Star Trek Diplomacy server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(async () => {
+    await closeDatabase();
+    process.exit(0);
+  });
 });
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  server.close(async () => {
+    await closeDatabase();
+    process.exit(0);
+  });
+});
+
+// Start the server
+startServer();
 
 module.exports = { app, server, io };

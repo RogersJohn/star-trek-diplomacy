@@ -10,9 +10,9 @@ const { getGameList } = require('../database');
 const games = new Map();
 
 // Get list of all games (for reconnection)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const gameList = getGameList();
+    const gameList = await getGameList();
     res.json({ success: true, games: gameList });
   } catch (error) {
     console.error('Error fetching game list:', error);
@@ -191,14 +191,14 @@ router.post('/:gameId/ability', (req, res) => {
 });
 
 // Check deadline and identify delinquent players
-router.post('/:gameId/check-deadline', (req, res) => {
+router.post('/:gameId/check-deadline', async (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
   const result = game.checkDeadline();
-  game.saveToDatabase();
+  await game.saveToDatabase();
 
   // Notify all players if deadline expired
   if (result.expired) {
@@ -212,7 +212,7 @@ router.post('/:gameId/check-deadline', (req, res) => {
 });
 
 // Vote to kick a delinquent player
-router.post('/:gameId/vote-kick', (req, res) => {
+router.post('/:gameId/vote-kick', async (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
@@ -225,7 +225,7 @@ router.post('/:gameId/vote-kick', (req, res) => {
   }
 
   const result = game.initiateKickVote(targetFaction, votingFaction);
-  game.saveToDatabase();
+  await game.saveToDatabase();
 
   // Emit socket event for real-time update
   const io = req.app.get('io');

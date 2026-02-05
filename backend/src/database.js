@@ -1,160 +1,155 @@
 /**
  * STAR TREK DIPLOMACY - Database Layer
  *
- * SQLite database for persisting game state, supporting server restarts
+ * PostgreSQL database for persisting game state, supporting server restarts
  * and reconnection scenarios.
  */
 
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-// Database file location
-const DB_PATH = path.join(__dirname, '..', 'data', 'diplomacy.db');
+// Connection pool - uses DATABASE_URL from environment (Railway provides this)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
 
-// Ensure data directory exists
-const dataDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+// Test connection on startup
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
 
-// Initialize database connection
-const db = new Database(DB_PATH);
-
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
 
 /**
  * Initialize database schema
  */
-function initializeDatabase() {
+async function initializeDatabase() {
   console.log('Initializing database schema...');
 
-  // Games table - stores active game state
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS games (
-      game_id TEXT PRIMARY KEY,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      game_data TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'active',
-      winner TEXT
-    )
-  `);
+  const client = await pool.connect();
+  try {
+    // Games table - stores active game state
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS games (
+        game_id TEXT PRIMARY KEY,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        game_data TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        winner TEXT
+      )
+    `);
 
-  // Players table - tracks players in each game
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS players (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_id TEXT NOT NULL,
-      faction TEXT NOT NULL,
-      player_name TEXT NOT NULL,
-      joined_at INTEGER NOT NULL,
-      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
-      UNIQUE(game_id, faction)
-    )
-  `);
+    // Players table - tracks players in each game
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        faction TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        joined_at BIGINT NOT NULL,
+        UNIQUE(game_id, faction)
+      )
+    `);
 
-  // Turns table - historical record of game turns
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS turns (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_id TEXT NOT NULL,
-      turn_number INTEGER NOT NULL,
-      year INTEGER NOT NULL,
-      season TEXT NOT NULL,
-      phase TEXT NOT NULL,
-      resolved_at INTEGER NOT NULL,
-      turn_data TEXT NOT NULL,
-      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
-      UNIQUE(game_id, turn_number)
-    )
-  `);
+    // Turns table - historical record of game turns
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS turns (
+        id SERIAL PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        turn_number INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        season TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        resolved_at BIGINT NOT NULL,
+        turn_data TEXT NOT NULL,
+        UNIQUE(game_id, turn_number)
+      )
+    `);
 
-  // Orders table - records all submitted orders
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_id TEXT NOT NULL,
-      turn_number INTEGER NOT NULL,
-      faction TEXT NOT NULL,
-      order_type TEXT NOT NULL,
-      order_data TEXT NOT NULL,
-      submitted_at INTEGER NOT NULL,
-      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
-    )
-  `);
+    // Orders table - records all submitted orders
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        turn_number INTEGER NOT NULL,
+        faction TEXT NOT NULL,
+        order_type TEXT NOT NULL,
+        order_data TEXT NOT NULL,
+        submitted_at BIGINT NOT NULL
+      )
+    `);
 
-  // Messages table - stores diplomatic messages
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_id TEXT NOT NULL,
-      from_faction TEXT NOT NULL,
-      to_faction TEXT,
-      message TEXT NOT NULL,
-      sent_at INTEGER NOT NULL,
-      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
-    )
-  `);
+    // Messages table - stores diplomatic messages
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        from_faction TEXT NOT NULL,
+        to_faction TEXT,
+        message TEXT NOT NULL,
+        sent_at BIGINT NOT NULL
+      )
+    `);
 
-  // Users table - tracks authenticated users
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      user_id TEXT PRIMARY KEY,
-      username TEXT,
-      created_at INTEGER NOT NULL,
-      last_seen INTEGER NOT NULL
-    )
-  `);
+    // Users table - tracks authenticated users
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        user_id TEXT PRIMARY KEY,
+        username TEXT,
+        created_at BIGINT NOT NULL,
+        last_seen BIGINT NOT NULL
+      )
+    `);
 
-  // User Games table - associates users with games for history tracking
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS user_games (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      game_id TEXT NOT NULL,
-      faction TEXT NOT NULL,
-      result TEXT,
-      ended_at INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-      FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
-      UNIQUE(user_id, game_id)
-    )
-  `);
+    // User Games table - associates users with games for history tracking
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_games (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        faction TEXT NOT NULL,
+        result TEXT,
+        ended_at BIGINT,
+        UNIQUE(user_id, game_id)
+      )
+    `);
 
-  // Create indexes for common queries
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
-    CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id);
-    CREATE INDEX IF NOT EXISTS idx_turns_game ON turns(game_id);
-    CREATE INDEX IF NOT EXISTS idx_orders_game_turn ON orders(game_id, turn_number);
-    CREATE INDEX IF NOT EXISTS idx_messages_game ON messages(game_id);
-    CREATE INDEX IF NOT EXISTS idx_user_games_user ON user_games(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_games_game ON user_games(game_id);
-  `);
+    // Create indexes for common queries
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_turns_game ON turns(game_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_orders_game_turn ON orders(game_id, turn_number)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_game ON messages(game_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_user_games_user ON user_games(user_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_user_games_game ON user_games(game_id)`);
 
-  console.log('Database schema initialized successfully');
+    console.log('Database schema initialized successfully');
 
-  // Create dev test users (player1 through player7)
-  createDevUsers();
+    // Create dev test users (player1 through player7)
+    await createDevUsers(client);
+  } finally {
+    client.release();
+  }
 }
 
 /**
  * Create predefined dev users for testing
  */
-function createDevUsers() {
+async function createDevUsers(client) {
   const now = Date.now();
-  const stmt = db.prepare(`
-    INSERT INTO users (user_id, username, created_at, last_seen)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_id) DO NOTHING
-  `);
 
   for (let i = 1; i <= 7; i++) {
     const userId = `dev_player${i}`;
     const username = `Player${i}`;
-    stmt.run(userId, username, now, now);
+    await client.query(
+      `INSERT INTO users (user_id, username, created_at, last_seen)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT(user_id) DO NOTHING`,
+      [userId, username, now, now]
+    );
   }
 
   console.log('Dev test users created (player1-player7)');
@@ -163,71 +158,88 @@ function createDevUsers() {
 /**
  * Save game state to database
  */
-function saveGame(gameId, gameData, playerFactions) {
+async function saveGame(gameId, gameData, playerFactions) {
   const now = Date.now();
   const gameDataJSON = JSON.stringify(gameData);
 
-  const stmt = db.prepare(`
-    INSERT INTO games (game_id, created_at, updated_at, game_data, status, winner)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(game_id) DO UPDATE SET
-      updated_at = excluded.updated_at,
-      game_data = excluded.game_data,
-      status = excluded.status,
-      winner = excluded.winner
-  `);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  stmt.run(
-    gameId,
-    now,
-    now,
-    gameDataJSON,
-    gameData.winner ? 'ended' : 'active',
-    gameData.winner || null
-  );
+    await client.query(
+      `INSERT INTO games (game_id, created_at, updated_at, game_data, status, winner)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT(game_id) DO UPDATE SET
+         updated_at = EXCLUDED.updated_at,
+         game_data = EXCLUDED.game_data,
+         status = EXCLUDED.status,
+         winner = EXCLUDED.winner`,
+      [
+        gameId,
+        now,
+        now,
+        gameDataJSON,
+        gameData.winner ? 'ended' : 'active',
+        gameData.winner || null,
+      ]
+    );
 
-  // Save players if this is a new game
-  const existingPlayers = db
-    .prepare('SELECT COUNT(*) as count FROM players WHERE game_id = ?')
-    .get(gameId);
-  if (existingPlayers.count === 0) {
-    const playerStmt = db.prepare(`
-      INSERT INTO players (game_id, faction, player_name, joined_at)
-      VALUES (?, ?, ?, ?)
-    `);
+    // Save players if this is a new game
+    const existingPlayers = await client.query(
+      'SELECT COUNT(*) as count FROM players WHERE game_id = $1',
+      [gameId]
+    );
 
-    for (const [faction, playerName] of Object.entries(playerFactions)) {
-      playerStmt.run(gameId, faction, playerName, now);
+    if (parseInt(existingPlayers.rows[0].count) === 0) {
+      for (const [faction, playerName] of Object.entries(playerFactions)) {
+        await client.query(
+          `INSERT INTO players (game_id, faction, player_name, joined_at)
+           VALUES ($1, $2, $3, $4)`,
+          [gameId, faction, playerName, now]
+        );
+      }
     }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
 /**
  * Load game state from database
  */
-function loadGame(gameId) {
-  const stmt = db.prepare('SELECT game_data FROM games WHERE game_id = ? AND status = ?');
-  const row = stmt.get(gameId, 'active');
+async function loadGame(gameId) {
+  const result = await pool.query(
+    'SELECT game_data FROM games WHERE game_id = $1 AND status = $2',
+    [gameId, 'active']
+  );
 
-  if (!row) {
+  if (result.rows.length === 0) {
     return null;
   }
 
-  return JSON.parse(row.game_data);
+  return JSON.parse(result.rows[0].game_data);
 }
 
 /**
  * Get all active games
  */
-function getActiveGames() {
-  const stmt = db.prepare(`
-    SELECT 
+async function getActiveGames() {
+  const result = await pool.query(`
+    SELECT
       g.game_id,
       g.created_at,
       g.updated_at,
       g.game_data,
-      json_group_array(
-        json_object('faction', p.faction, 'playerName', p.player_name)
+      COALESCE(
+        json_agg(
+          json_build_object('faction', p.faction, 'playerName', p.player_name)
+        ) FILTER (WHERE p.faction IS NOT NULL),
+        '[]'
       ) as players
     FROM games g
     LEFT JOIN players p ON g.game_id = p.game_id
@@ -235,96 +247,100 @@ function getActiveGames() {
     GROUP BY g.game_id
   `);
 
-  const rows = stmt.all();
-  return rows.map(row => ({
+  return result.rows.map(row => ({
     gameId: row.game_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: parseInt(row.created_at),
+    updatedAt: parseInt(row.updated_at),
     gameData: JSON.parse(row.game_data),
-    players: JSON.parse(row.players),
+    players: row.players,
   }));
 }
 
 /**
  * Save turn history
  */
-function saveTurn(gameId, turnNumber, year, season, phase, turnData) {
-  const stmt = db.prepare(`
-    INSERT INTO turns (game_id, turn_number, year, season, phase, resolved_at, turn_data)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(gameId, turnNumber, year, season, phase, Date.now(), JSON.stringify(turnData));
+async function saveTurn(gameId, turnNumber, year, season, phase, turnData) {
+  await pool.query(
+    `INSERT INTO turns (game_id, turn_number, year, season, phase, resolved_at, turn_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [gameId, turnNumber, year, season, phase, Date.now(), JSON.stringify(turnData)]
+  );
 }
 
 /**
  * Save order submission
  */
-function saveOrder(gameId, turnNumber, faction, orderType, orderData) {
-  const stmt = db.prepare(`
-    INSERT INTO orders (game_id, turn_number, faction, order_type, order_data, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(gameId, turnNumber, faction, orderType, JSON.stringify(orderData), Date.now());
+async function saveOrder(gameId, turnNumber, faction, orderType, orderData) {
+  await pool.query(
+    `INSERT INTO orders (game_id, turn_number, faction, order_type, order_data, submitted_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [gameId, turnNumber, faction, orderType, JSON.stringify(orderData), Date.now()]
+  );
 }
 
 /**
  * Save diplomatic message
  */
-function saveMessage(gameId, fromFaction, toFaction, message) {
-  const stmt = db.prepare(`
-    INSERT INTO messages (game_id, from_faction, to_faction, message, sent_at)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(gameId, fromFaction, toFaction || null, message, Date.now());
+async function saveMessage(gameId, fromFaction, toFaction, message) {
+  await pool.query(
+    `INSERT INTO messages (game_id, from_faction, to_faction, message, sent_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [gameId, fromFaction, toFaction || null, message, Date.now()]
+  );
 }
 
 /**
  * Get messages for a game
  */
-function getMessages(gameId) {
-  const stmt = db.prepare(`
-    SELECT from_faction, to_faction, message, sent_at
-    FROM messages
-    WHERE game_id = ?
-    ORDER BY sent_at ASC
-  `);
+async function getMessages(gameId) {
+  const result = await pool.query(
+    `SELECT from_faction, to_faction, message, sent_at
+     FROM messages
+     WHERE game_id = $1
+     ORDER BY sent_at ASC`,
+    [gameId]
+  );
 
-  return stmt.all(gameId);
+  return result.rows.map(row => ({
+    from_faction: row.from_faction,
+    to_faction: row.to_faction,
+    message: row.message,
+    sent_at: parseInt(row.sent_at),
+  }));
 }
 
 /**
  * Mark game as ended
  */
-function endGame(gameId, winner) {
-  const stmt = db.prepare(`
-    UPDATE games
-    SET status = 'ended', winner = ?, updated_at = ?
-    WHERE game_id = ?
-  `);
-
-  stmt.run(winner, Date.now(), gameId);
+async function endGame(gameId, winner) {
+  await pool.query(
+    `UPDATE games
+     SET status = 'ended', winner = $1, updated_at = $2
+     WHERE game_id = $3`,
+    [winner, Date.now(), gameId]
+  );
 }
 
 /**
  * Get game list with summary info
  */
-function getGameList() {
-  const stmt = db.prepare(`
-    SELECT 
+async function getGameList() {
+  const result = await pool.query(`
+    SELECT
       g.game_id,
       g.created_at,
       g.updated_at,
       g.status,
       g.winner,
-      json_extract(g.game_data, '$.turn') as turn,
-      json_extract(g.game_data, '$.year') as year,
-      json_extract(g.game_data, '$.season') as season,
-      json_extract(g.game_data, '$.phase') as phase,
-      json_group_array(
-        json_object('faction', p.faction, 'playerName', p.player_name)
+      g.game_data::json->>'turn' as turn,
+      g.game_data::json->>'year' as year,
+      g.game_data::json->>'season' as season,
+      g.game_data::json->>'phase' as phase,
+      COALESCE(
+        json_agg(
+          json_build_object('faction', p.faction, 'playerName', p.player_name)
+        ) FILTER (WHERE p.faction IS NOT NULL),
+        '[]'
       ) as players
     FROM games g
     LEFT JOIN players p ON g.game_id = p.game_id
@@ -332,127 +348,144 @@ function getGameList() {
     ORDER BY g.updated_at DESC
   `);
 
-  const rows = stmt.all();
-  return rows.map(row => ({
+  return result.rows.map(row => ({
     gameId: row.game_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: parseInt(row.created_at),
+    updatedAt: parseInt(row.updated_at),
     status: row.status,
     winner: row.winner,
-    turn: row.turn,
-    year: row.year,
+    turn: row.turn ? parseInt(row.turn) : null,
+    year: row.year ? parseInt(row.year) : null,
     season: row.season,
     phase: row.phase,
-    players: JSON.parse(row.players),
+    players: row.players,
   }));
 }
 
 /**
  * Delete old completed games (optional cleanup)
  */
-function deleteOldGames(daysOld = 30) {
+async function deleteOldGames(daysOld = 30) {
   const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000;
-  const stmt = db.prepare(`
-    DELETE FROM games
-    WHERE status = 'ended' AND updated_at < ?
-  `);
+  const result = await pool.query(
+    `DELETE FROM games
+     WHERE status = 'ended' AND updated_at < $1`,
+    [cutoffTime]
+  );
 
-  const result = stmt.run(cutoffTime);
-  return result.changes;
+  return result.rowCount;
 }
+
 /**
  * Create or update user record
  */
-function upsertUser(userId, username) {
+async function upsertUser(userId, username) {
   const now = Date.now();
-  const stmt = db.prepare(`
-    INSERT INTO users (user_id, username, created_at, last_seen)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET
-      username = excluded.username,
-      last_seen = excluded.last_seen
-  `);
-
-  stmt.run(userId, username, now, now);
+  await pool.query(
+    `INSERT INTO users (user_id, username, created_at, last_seen)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(user_id) DO UPDATE SET
+       username = EXCLUDED.username,
+       last_seen = EXCLUDED.last_seen`,
+    [userId, username, now, now]
+  );
 }
 
 /**
  * Associate user with a game
  */
-function createUserGame(userId, gameId, faction) {
-  const stmt = db.prepare(`
-    INSERT INTO user_games (user_id, game_id, faction, result, ended_at)
-    VALUES (?, ?, ?, NULL, NULL)
-    ON CONFLICT(user_id, game_id) DO NOTHING
-  `);
-
-  stmt.run(userId, gameId, faction);
+async function createUserGame(userId, gameId, faction) {
+  await pool.query(
+    `INSERT INTO user_games (user_id, game_id, faction, result, ended_at)
+     VALUES ($1, $2, $3, NULL, NULL)
+     ON CONFLICT(user_id, game_id) DO NOTHING`,
+    [userId, gameId, faction]
+  );
 }
 
 /**
  * Record game result for user
  */
-function recordGameResult(userId, gameId, result) {
-  const stmt = db.prepare(`
-    UPDATE user_games
-    SET result = ?, ended_at = ?
-    WHERE user_id = ? AND game_id = ?
-  `);
-
-  stmt.run(result, Date.now(), userId, gameId);
+async function recordGameResult(userId, gameId, result) {
+  await pool.query(
+    `UPDATE user_games
+     SET result = $1, ended_at = $2
+     WHERE user_id = $3 AND game_id = $4`,
+    [result, Date.now(), userId, gameId]
+  );
 }
 
 /**
  * Get user's game history
  */
-function getUserGameHistory(userId, limit = 10) {
-  const stmt = db.prepare(`
-    SELECT 
+async function getUserGameHistory(userId, limit = 10) {
+  const result = await pool.query(
+    `SELECT
       ug.game_id,
       ug.faction,
       ug.result,
       ug.ended_at,
       g.status,
-      json_extract(g.game_data, '$.turn') as final_turn
+      g.game_data::json->>'turn' as final_turn
     FROM user_games ug
     JOIN games g ON ug.game_id = g.game_id
-    WHERE ug.user_id = ?
+    WHERE ug.user_id = $1
     ORDER BY COALESCE(ug.ended_at, g.updated_at) DESC
-    LIMIT ?
-  `);
+    LIMIT $2`,
+    [userId, limit]
+  );
 
-  return stmt.all(userId, limit);
+  return result.rows.map(row => ({
+    game_id: row.game_id,
+    faction: row.faction,
+    result: row.result,
+    ended_at: row.ended_at ? parseInt(row.ended_at) : null,
+    status: row.status,
+    final_turn: row.final_turn ? parseInt(row.final_turn) : null,
+  }));
 }
 
 /**
  * Get user stats (win rate, total games, etc.)
  */
-function getUserStats(userId) {
-  const stmt = db.prepare(`
-    SELECT 
+async function getUserStats(userId) {
+  const result = await pool.query(
+    `SELECT
       COUNT(*) as total_games,
       SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
       SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses,
       SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) as draws
     FROM user_games
-    WHERE user_id = ? AND result IS NOT NULL
-  `);
+    WHERE user_id = $1 AND result IS NOT NULL`,
+    [userId]
+  );
 
-  const stats = stmt.get(userId);
-  
+  const stats = result.rows[0];
+  const totalGames = parseInt(stats.total_games) || 0;
+  const wins = parseInt(stats.wins) || 0;
+  const losses = parseInt(stats.losses) || 0;
+  const draws = parseInt(stats.draws) || 0;
+
   return {
-    totalGames: stats.total_games || 0,
-    wins: stats.wins || 0,
-    losses: stats.losses || 0,
-    draws: stats.draws || 0,
-    winRate: stats.total_games > 0 ? (stats.wins / stats.total_games) * 100 : 0,
+    totalGames,
+    wins,
+    losses,
+    draws,
+    winRate: totalGames > 0 ? (wins / totalGames) * 100 : 0,
   };
 }
-// Initialize on module load
-initializeDatabase();
+
+/**
+ * Close database pool (for graceful shutdown)
+ */
+async function closeDatabase() {
+  await pool.end();
+  console.log('Database connection pool closed');
+}
 
 module.exports = {
-  db,
+  pool,
+  initializeDatabase,
   saveGame,
   loadGame,
   getActiveGames,
@@ -468,4 +501,5 @@ module.exports = {
   recordGameResult,
   getUserGameHistory,
   getUserStats,
+  closeDatabase,
 };

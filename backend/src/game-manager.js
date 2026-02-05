@@ -18,7 +18,7 @@ const {
 const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('./engine/map-data');
 const { LatinumEconomy, AbilityManager, FACTION_ABILITIES } = require('./engine/faction-abilities');
 const { AllianceManager } = require('./engine/alliance-system');
-const { saveGame, saveTurn, saveOrder, saveMessage, loadGame, getActiveGames } = require('./database');
+const { saveGame, saveMessage, getActiveGames } = require('./database');
 
 class GameManager {
   constructor(gameId, playerFactions, settings = {}) {
@@ -629,7 +629,7 @@ class GameManager {
   /**
    * Add a message
    */
-  addMessage(from, to, content, isPublic = false) {
+  async addMessage(from, to, content, isPublic = false) {
     const message = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       from,
@@ -640,10 +640,10 @@ class GameManager {
     };
 
     this.messages.push(message);
-    
+
     // Save message to database
-    saveMessage(this.gameId, from, isPublic ? null : to, content);
-    
+    await saveMessage(this.gameId, from, isPublic ? null : to, content);
+
     return message;
   }
 
@@ -793,10 +793,10 @@ class GameManager {
   /**
    * Save game state to database
    */
-  saveToDatabase() {
+  async saveToDatabase() {
     try {
       const gameData = this.toJSON();
-      saveGame(this.gameId, gameData, this.playerFactions);
+      await saveGame(this.gameId, gameData, this.playerFactions);
       console.log(`Game ${this.gameId} saved to database`);
     } catch (error) {
       console.error(`Error saving game ${this.gameId}:`, error);
@@ -842,13 +842,13 @@ class GameManager {
   /**
    * Load all active games from database
    */
-  static loadActiveGames() {
+  static async loadActiveGames() {
     console.log('Loading active games from database...');
     const games = new Map();
-    
+
     try {
-      const activeGames = getActiveGames();
-      
+      const activeGames = await getActiveGames();
+
       for (const { gameId, gameData } of activeGames) {
         try {
           const game = GameManager.fromJSON(gameData);
@@ -858,12 +858,12 @@ class GameManager {
           console.error(`Error loading game ${gameId}:`, error);
         }
       }
-      
+
       console.log(`Successfully loaded ${games.size} active game(s)`);
     } catch (error) {
       console.error('Error loading active games:', error);
     }
-    
+
     return games;
   }
 }

@@ -11,13 +11,13 @@ const { getUserGameHistory, getUserStats, upsertUser } = require('../database');
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const userInfo = getUserInfo(req);
-    
+
     if (!userInfo) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const stats = getUserStats(userInfo.userId);
-    const history = getUserGameHistory(userInfo.userId, 20);
+    const stats = await getUserStats(userInfo.userId);
+    const history = await getUserGameHistory(userInfo.userId, 20);
 
     res.json({
       success: true,
@@ -36,7 +36,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // Get specific user stats (public)
 router.get('/:userId/stats', async (req, res) => {
   try {
-    const stats = getUserStats(req.params.userId);
+    const stats = await getUserStats(req.params.userId);
     res.json({ success: true, stats });
   } catch (error) {
     console.error('Error fetching user stats:', error);

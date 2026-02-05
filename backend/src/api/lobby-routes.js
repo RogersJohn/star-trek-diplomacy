@@ -13,13 +13,13 @@ const { upsertUser, createUserGame } = require('../database');
 const lobbies = new Map();
 
 // Create a new lobby
-router.post('/create', optionalAuth, (req, res) => {
+router.post('/create', optionalAuth, async (req, res) => {
   const { hostName, settings, userId } = req.body;
   const userInfo = getUserInfo(req);
 
   // If authenticated, update user record
   if (userInfo) {
-    upsertUser(userInfo.userId, hostName);
+    await upsertUser(userInfo.userId, hostName);
   }
 
   const lobbyId = generateLobbyId();
@@ -42,7 +42,7 @@ router.post('/create', optionalAuth, (req, res) => {
 });
 
 // Join a lobby
-router.post('/:lobbyId/join', optionalAuth, (req, res) => {
+router.post('/:lobbyId/join', optionalAuth, async (req, res) => {
   const { playerName, userId } = req.body;
   const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
@@ -70,7 +70,7 @@ router.post('/:lobbyId/join', optionalAuth, (req, res) => {
 
   // If authenticated, update user record
   if (userInfo) {
-    upsertUser(userInfo.userId, playerName);
+    await upsertUser(userInfo.userId, playerName);
   }
 
   lobby.players.push({ name: playerName, faction: null, ready: false, userId: actualUserId });
@@ -155,7 +155,7 @@ router.post('/:lobbyId/ready', (req, res) => {
 });
 
 // Start the game
-router.post('/:lobbyId/start', (req, res) => {
+router.post('/:lobbyId/start', async (req, res) => {
   const lobby = lobbies.get(req.params.lobbyId);
 
   if (!lobby) {
@@ -183,14 +183,14 @@ router.post('/:lobbyId/start', (req, res) => {
   games.set(gameId, game);
 
   // Save initial game state to database
-  game.saveToDatabase();
+  await game.saveToDatabase();
 
   // Associate authenticated users with this game
-  lobby.players.forEach(p => {
+  for (const p of lobby.players) {
     if (p.userId) {
-      createUserGame(p.userId, gameId, p.faction);
+      await createUserGame(p.userId, gameId, p.faction);
     }
-  });
+  }
 
   lobby.status = 'started';
   lobby.gameId = gameId;
