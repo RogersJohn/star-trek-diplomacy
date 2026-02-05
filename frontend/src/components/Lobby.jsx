@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useGameStore } from '../hooks/useGameStore'
+import { useUser, useAuth } from '@clerk/clerk-react'
+import { useGameStore, setAuthTokenGetter } from '../hooks/useGameStore'
 
 const FACTIONS = [
   { id: 'federation', name: 'Federation', color: '#3399ff', ability: 'Diplomatic Immunity' },
@@ -15,22 +16,34 @@ const FACTIONS = [
 export default function Lobby() {
   const { lobbyId } = useParams()
   const navigate = useNavigate()
+  const { user } = useUser()
+  const { getToken } = useAuth()
   const { playerName, connect, socket } = useGameStore()
-  
+
   const [lobby, setLobby] = useState(null)
   const [selectedFaction, setSelectedFaction] = useState(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState('')
   const [turnTimerDays, setTurnTimerDays] = useState(3)
-  
+
+  const getAuthHeaders = async () => {
+    const token = await getToken()
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    }
+  }
+
   useEffect(() => {
+    // Set up auth token getter for the store
+    setAuthTokenGetter(getToken)
     connect()
     fetchLobby()
-    
+
     return () => {
       // Cleanup
     }
-  }, [lobbyId])
+  }, [lobbyId, getToken])
   
   useEffect(() => {
     if (socket) {
@@ -64,14 +77,14 @@ export default function Lobby() {
     try {
       const res = await fetch(`/api/lobby/${lobbyId}`)
       const data = await res.json()
-      
+
       if (data.error) {
         setError(data.error)
       } else {
         setLobby(data)
 
-        // Find my current selection
-        const me = data.players.find(p => p.name === playerName)
+        // Find my current selection by Clerk user ID
+        const me = data.players.find(p => p.userId === user?.id)
         if (me) {
           setSelectedFaction(me.faction)
           setIsReady(me.ready)
@@ -89,12 +102,13 @@ export default function Lobby() {
   
   const handleSelectFaction = async (factionId) => {
     try {
+      const headers = await getAuthHeaders()
       const res = await fetch(`/api/lobby/${lobbyId}/select-faction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName, faction: factionId })
+        headers,
+        body: JSON.stringify({ faction: factionId })
       })
-      
+
       const data = await res.json()
       if (data.success) {
         setSelectedFaction(factionId)
@@ -108,12 +122,13 @@ export default function Lobby() {
   
   const handleToggleReady = async () => {
     try {
+      const headers = await getAuthHeaders()
       const res = await fetch(`/api/lobby/${lobbyId}/ready`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName, ready: !isReady })
+        headers,
+        body: JSON.stringify({ ready: !isReady })
       })
-      
+
       const data = await res.json()
       if (data.success) {
         setIsReady(!isReady)
@@ -125,9 +140,10 @@ export default function Lobby() {
   
   const handleStartGame = async () => {
     try {
+      const headers = await getAuthHeaders()
       const res = await fetch(`/api/lobby/${lobbyId}/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers,
       })
 
       const data = await res.json()
@@ -141,9 +157,10 @@ export default function Lobby() {
 
   const handleUpdateSettings = async (newSettings) => {
     try {
+      const headers = await getAuthHeaders()
       const res = await fetch(`/api/lobby/${lobbyId}/settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(newSettings)
       })
 
@@ -160,7 +177,7 @@ export default function Lobby() {
     }
   }
   
-  const isHost = lobby?.host === playerName
+  const isHost = lobby?.hostUserId === user?.id
   const allReady = lobby?.players.every(p => p.ready && p.faction)
   const canStart = isHost && allReady && lobby?.players.length >= 3
   
@@ -258,7 +275,7 @@ export default function Lobby() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: faction?.color || '#666' }}
                     />
-                    <span className={player.name === playerName ? 'text-lcars-tan' : ''}>
+                    <span className={player.userId === user?.id ? 'text-lcars-tan' : ''}>
                       {player.name}
                       {player.name === lobby.host && ' (Host)'}
                     </span>

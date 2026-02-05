@@ -4,7 +4,7 @@
 
 const { AbilityManager, LatinumEconomy, FACTION_ABILITIES } = require('../faction-abilities');
 const { GameState, Adjudicator, OrderValidator, initializeMapData, FACTIONS } = require('../diplomacy-engine');
-const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('../map-data');
+const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('@star-trek-diplomacy/shared');
 
 // Initialize map data before tests
 beforeAll(() => {

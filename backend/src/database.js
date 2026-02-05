@@ -117,6 +117,20 @@ async function initializeDatabase() {
       )
     `);
 
+    // Game Players table - authoritative record of which user controls which faction
+    // This is used for authorization checks on every game action
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS game_players (
+        id SERIAL PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        faction TEXT NOT NULL,
+        joined_at BIGINT NOT NULL,
+        UNIQUE(game_id, user_id),
+        UNIQUE(game_id, faction)
+      )
+    `);
+
     // Create indexes for common queries
     await client.query(`CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id)`);
@@ -125,34 +139,13 @@ async function initializeDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_game ON messages(game_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_user_games_user ON user_games(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_user_games_game ON user_games(game_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_game_players_game ON game_players(game_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_game_players_user ON game_players(user_id)`);
 
     console.log('Database schema initialized successfully');
-
-    // Create dev test users (player1 through player7)
-    await createDevUsers(client);
   } finally {
     client.release();
   }
-}
-
-/**
- * Create predefined dev users for testing
- */
-async function createDevUsers(client) {
-  const now = Date.now();
-
-  for (let i = 1; i <= 7; i++) {
-    const userId = `dev_player${i}`;
-    const username = `Player${i}`;
-    await client.query(
-      `INSERT INTO users (user_id, username, created_at, last_seen)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT(user_id) DO NOTHING`,
-      [userId, username, now, now]
-    );
-  }
-
-  console.log('Dev test users created (player1-player7)');
 }
 
 /**
@@ -483,6 +476,41 @@ async function closeDatabase() {
   console.log('Database connection pool closed');
 }
 
+/**
+ * Add a player to a game (for authorization)
+ */
+async function createGamePlayer(gameId, userId, faction) {
+  await pool.query(
+    `INSERT INTO game_players (game_id, user_id, faction, joined_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(game_id, user_id) DO NOTHING`,
+    [gameId, userId, faction, Date.now()]
+  );
+}
+
+/**
+ * Get the faction a user controls in a specific game
+ * Returns null if user is not a player in this game
+ */
+async function getUserFactionInGame(gameId, userId) {
+  const result = await pool.query(
+    'SELECT faction FROM game_players WHERE game_id = $1 AND user_id = $2',
+    [gameId, userId]
+  );
+  return result.rows.length > 0 ? result.rows[0].faction : null;
+}
+
+/**
+ * Get all players in a game (for reconnection)
+ */
+async function getGamePlayers(gameId) {
+  const result = await pool.query(
+    'SELECT user_id, faction FROM game_players WHERE game_id = $1',
+    [gameId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -502,4 +530,7 @@ module.exports = {
   getUserGameHistory,
   getUserStats,
   closeDatabase,
+  createGamePlayer,
+  getUserFactionInGame,
+  getGamePlayers,
 };

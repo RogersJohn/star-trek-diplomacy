@@ -230,9 +230,4 @@ const FACTION_NAMES = {
     gorn: 'Gorn Hegemony'
 };
 
-// Export for both CommonJS and ES modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS, FACTION_NAMES };
-}
-
-export { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS, FACTION_NAMES };
+module.exports = { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS, FACTION_NAMES };

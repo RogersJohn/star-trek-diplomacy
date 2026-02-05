@@ -15,7 +15,7 @@ const {
   VICTORY_CONDITIONS,
   getAdjacent,
 } = require('./engine/diplomacy-engine');
-const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('./engine/map-data');
+const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('@star-trek-diplomacy/shared');
 const { LatinumEconomy, AbilityManager, FACTION_ABILITIES } = require('./engine/faction-abilities');
 const { AllianceManager } = require('./engine/alliance-system');
 const { saveGame, saveMessage, getActiveGames } = require('./database');

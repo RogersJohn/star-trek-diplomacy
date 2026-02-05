@@ -1,33 +1,42 @@
 /**
  * STAR TREK DIPLOMACY - Lobby API Routes
+ *
+ * All lobby operations require Clerk authentication.
  */
 
 const express = require('express');
 const router = express.Router();
 const GameManager = require('../game-manager');
 const { games } = require('./game-routes');
-const { optionalAuth, getUserInfo } = require('../middleware/auth');
-const { upsertUser, createUserGame } = require('../database');
+const { requireAuth, getUserInfo } = require('../middleware/auth');
+const { upsertUser, createUserGame, createGamePlayer } = require('../database');
 
 // In-memory lobby storage (replace with database in production)
 const lobbies = new Map();
 
-// Create a new lobby
-router.post('/create', optionalAuth, async (req, res) => {
-  const { hostName, settings, userId } = req.body;
+// Create a new lobby - requires authentication
+router.post('/create', requireAuth, async (req, res) => {
+  const { hostName, settings } = req.body;
   const userInfo = getUserInfo(req);
 
-  // If authenticated, update user record
-  if (userInfo) {
-    await upsertUser(userInfo.userId, hostName);
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
+
+  // Update user record with display name
+  await upsertUser(userInfo.userId, hostName);
 
   const lobbyId = generateLobbyId();
   const lobby = {
     id: lobbyId,
     host: hostName,
-    hostUserId: userId || userInfo?.userId,
-    players: [{ name: hostName, faction: null, ready: false, userId: userId || userInfo?.userId }],
+    hostUserId: userInfo.userId,
+    players: [{
+      name: hostName,
+      faction: null,
+      ready: false,
+      userId: userInfo.userId,
+    }],
     settings: {
       turnTimer: settings?.turnTimer || 24 * 60 * 60 * 1000, // 24 hours default
       allowSpectators: settings?.allowSpectators ?? true,
@@ -41,11 +50,15 @@ router.post('/create', optionalAuth, async (req, res) => {
   res.json({ success: true, lobby });
 });
 
-// Join a lobby
-router.post('/:lobbyId/join', optionalAuth, async (req, res) => {
-  const { playerName, userId } = req.body;
+// Join a lobby - requires authentication
+router.post('/:lobbyId/join', requireAuth, async (req, res) => {
+  const { playerName } = req.body;
   const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
@@ -60,20 +73,22 @@ router.post('/:lobbyId/join', optionalAuth, async (req, res) => {
   }
 
   // Check for duplicate names or user IDs
-  const actualUserId = userId || userInfo?.userId;
   if (lobby.players.some(p => p.name === playerName)) {
     return res.status(400).json({ error: 'Name already taken' });
   }
-  if (actualUserId && lobby.players.some(p => p.userId === actualUserId)) {
+  if (lobby.players.some(p => p.userId === userInfo.userId)) {
     return res.status(400).json({ error: 'You are already in this lobby' });
   }
 
-  // If authenticated, update user record
-  if (userInfo) {
-    await upsertUser(userInfo.userId, playerName);
-  }
+  // Update user record with display name
+  await upsertUser(userInfo.userId, playerName);
 
-  lobby.players.push({ name: playerName, faction: null, ready: false, userId: actualUserId });
+  lobby.players.push({
+    name: playerName,
+    faction: null,
+    ready: false,
+    userId: userInfo.userId,
+  });
 
   // Notify via WebSocket
   const io = req.app.get('io');
@@ -82,21 +97,33 @@ router.post('/:lobbyId/join', optionalAuth, async (req, res) => {
   res.json({ success: true, lobby });
 });
 
-// Leave a lobby
-router.post('/:lobbyId/leave', (req, res) => {
-  const { playerName } = req.body;
+// Leave a lobby - requires authentication
+router.post('/:lobbyId/leave', requireAuth, (req, res) => {
+  const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
   }
 
-  lobby.players = lobby.players.filter(p => p.name !== playerName);
+  // Find player by userId, not by name (more secure)
+  const player = lobby.players.find(p => p.userId === userInfo.userId);
+  if (!player) {
+    return res.status(400).json({ error: 'You are not in this lobby' });
+  }
+
+  const playerName = player.name;
+  lobby.players = lobby.players.filter(p => p.userId !== userInfo.userId);
 
   // If host leaves, assign new host or delete lobby
-  if (lobby.host === playerName) {
+  if (lobby.hostUserId === userInfo.userId) {
     if (lobby.players.length > 0) {
       lobby.host = lobby.players[0].name;
+      lobby.hostUserId = lobby.players[0].userId;
     } else {
       lobbies.delete(req.params.lobbyId);
       return res.json({ success: true, lobbyDeleted: true });
@@ -109,57 +136,89 @@ router.post('/:lobbyId/leave', (req, res) => {
   res.json({ success: true, lobby });
 });
 
-// Select faction
-router.post('/:lobbyId/select-faction', (req, res) => {
-  const { playerName, faction } = req.body;
+// Select faction - requires authentication
+router.post('/:lobbyId/select-faction', requireAuth, (req, res) => {
+  const { faction } = req.body;
+  const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
+  }
+
+  // Find player by userId
+  const player = lobby.players.find(p => p.userId === userInfo.userId);
+  if (!player) {
+    return res.status(400).json({ error: 'You are not in this lobby' });
   }
 
   // Check faction isn't taken
-  if (faction && lobby.players.some(p => p.faction === faction && p.name !== playerName)) {
+  if (faction && lobby.players.some(p => p.faction === faction && p.userId !== userInfo.userId)) {
     return res.status(400).json({ error: 'Faction already taken' });
   }
 
-  const player = lobby.players.find(p => p.name === playerName);
-  if (player) {
-    player.faction = faction;
-  }
+  player.faction = faction;
 
   const io = req.app.get('io');
-  io.to(`lobby:${req.params.lobbyId}`).emit('faction_selected', { playerName, faction });
+  io.to(`lobby:${req.params.lobbyId}`).emit('faction_selected', {
+    playerName: player.name,
+    faction,
+  });
 
   res.json({ success: true, lobby });
 });
 
-// Mark ready
-router.post('/:lobbyId/ready', (req, res) => {
-  const { playerName, ready } = req.body;
+// Mark ready - requires authentication
+router.post('/:lobbyId/ready', requireAuth, (req, res) => {
+  const { ready } = req.body;
+  const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
   }
 
-  const player = lobby.players.find(p => p.name === playerName);
-  if (player) {
-    player.ready = ready;
+  // Find player by userId
+  const player = lobby.players.find(p => p.userId === userInfo.userId);
+  if (!player) {
+    return res.status(400).json({ error: 'You are not in this lobby' });
   }
 
+  player.ready = ready;
+
   const io = req.app.get('io');
-  io.to(`lobby:${req.params.lobbyId}`).emit('player_ready_changed', { playerName, ready });
+  io.to(`lobby:${req.params.lobbyId}`).emit('player_ready_changed', {
+    playerName: player.name,
+    ready,
+  });
 
   res.json({ success: true, lobby });
 });
 
-// Start the game
-router.post('/:lobbyId/start', async (req, res) => {
+// Start the game - requires authentication (host only)
+router.post('/:lobbyId/start', requireAuth, async (req, res) => {
+  const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
+  }
+
+  // Only host can start the game
+  if (lobby.hostUserId !== userInfo.userId) {
+    return res.status(403).json({ error: 'Only the host can start the game' });
   }
 
   // Validate all players are ready and have factions
@@ -185,11 +244,12 @@ router.post('/:lobbyId/start', async (req, res) => {
   // Save initial game state to database
   await game.saveToDatabase();
 
-  // Associate authenticated users with this game
+  // Create game_players records for authorization
+  // This is the authoritative record of who controls which faction
   for (const p of lobby.players) {
-    if (p.userId) {
-      await createUserGame(p.userId, gameId, p.faction);
-    }
+    await createGamePlayer(gameId, p.userId, p.faction);
+    // Also create user_games for history tracking
+    await createUserGame(p.userId, gameId, p.faction);
   }
 
   lobby.status = 'started';
@@ -201,12 +261,22 @@ router.post('/:lobbyId/start', async (req, res) => {
   res.json({ success: true, gameId });
 });
 
-// Update lobby settings (host only)
-router.post('/:lobbyId/settings', (req, res) => {
+// Update lobby settings (host only) - requires authentication
+router.post('/:lobbyId/settings', requireAuth, (req, res) => {
+  const userInfo = getUserInfo(req);
   const lobby = lobbies.get(req.params.lobbyId);
+
+  if (!userInfo) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
+  }
+
+  // Only host can change settings
+  if (lobby.hostUserId !== userInfo.userId) {
+    return res.status(403).json({ error: 'Only the host can change settings' });
   }
 
   // Only allow updating settings when game hasn't started
@@ -224,7 +294,7 @@ router.post('/:lobbyId/settings', (req, res) => {
   res.json({ success: true, settings: lobby.settings });
 });
 
-// Get lobby info
+// Get lobby info (public)
 router.get('/:lobbyId', (req, res) => {
   const lobby = lobbies.get(req.params.lobbyId);
 
@@ -235,7 +305,7 @@ router.get('/:lobbyId', (req, res) => {
   res.json(lobby);
 });
 
-// List public lobbies
+// List public lobbies (public)
 router.get('/', (req, res) => {
   const publicLobbies = Array.from(lobbies.values())
     .filter(l => l.status === 'waiting')

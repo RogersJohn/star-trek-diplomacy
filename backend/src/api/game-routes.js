@@ -1,11 +1,15 @@
 /**
  * STAR TREK DIPLOMACY - Game API Routes
+ *
+ * All mutation endpoints require authentication and faction ownership verification.
  */
 
 const express = require('express');
 const router = express.Router();
 const GameManager = require('../game-manager');
 const { getGameList } = require('../database');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireFactionOwnership, attachUserFaction } = require('../middleware/game-auth');
 
 const games = new Map();
 
@@ -20,7 +24,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get game state
+// Get game state (public)
 router.get('/:gameId', (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
@@ -31,18 +35,28 @@ router.get('/:gameId', (req, res) => {
 });
 
 // Get game state for specific player (includes their private info)
-router.get('/:gameId/player/:faction', (req, res) => {
+// Requires auth to ensure only the faction owner can see their private state
+router.get('/:gameId/player/:faction', requireAuth, attachUserFaction, (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
+  // Verify the authenticated user owns this faction
+  if (req.userFaction !== req.params.faction) {
+    return res.status(403).json({
+      error: 'You can only view your own faction state',
+      yourFaction: req.userFaction,
+    });
+  }
+
   res.json(game.getPlayerState(req.params.faction));
 });
 
-// Submit orders
-router.post('/:gameId/orders', (req, res) => {
-  const { faction, orders } = req.body;
+// Submit orders - requires auth + faction ownership
+router.post('/:gameId/orders', requireAuth, requireFactionOwnership, (req, res) => {
+  const { orders } = req.body;
+  const faction = req.verifiedFaction; // Use server-verified faction
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -66,7 +80,7 @@ router.post('/:gameId/orders', (req, res) => {
   res.json(result);
 });
 
-// Get available moves for a unit
+// Get available moves for a unit (public info)
 router.get('/:gameId/moves/:location', (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
@@ -77,9 +91,10 @@ router.get('/:gameId/moves/:location', (req, res) => {
   res.json({ location: req.params.location, moves });
 });
 
-// Submit retreat orders
-router.post('/:gameId/retreats', (req, res) => {
-  const { faction, retreats } = req.body;
+// Submit retreat orders - requires auth + faction ownership
+router.post('/:gameId/retreats', requireAuth, requireFactionOwnership, (req, res) => {
+  const { retreats } = req.body;
+  const faction = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -90,9 +105,10 @@ router.post('/:gameId/retreats', (req, res) => {
   res.json(result);
 });
 
-// Submit builds/disbands
-router.post('/:gameId/builds', (req, res) => {
-  const { faction, builds } = req.body;
+// Submit builds/disbands - requires auth + faction ownership
+router.post('/:gameId/builds', requireAuth, requireFactionOwnership, (req, res) => {
+  const { builds } = req.body;
+  const faction = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -103,7 +119,7 @@ router.post('/:gameId/builds', (req, res) => {
   res.json(result);
 });
 
-// Get turn history
+// Get turn history (public info)
 router.get('/:gameId/history', (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
@@ -113,9 +129,15 @@ router.get('/:gameId/history', (req, res) => {
   res.json(game.getHistory());
 });
 
-// Alliance actions
-router.post('/:gameId/alliance/propose', (req, res) => {
-  const { from, to, type } = req.body;
+// Propose alliance - requires auth + faction ownership
+// Note: uses 'from' field as the faction
+router.post('/:gameId/alliance/propose', requireAuth, async (req, res, next) => {
+  // Remap 'from' to 'faction' for the middleware
+  req.body.faction = req.body.from;
+  next();
+}, requireFactionOwnership, (req, res) => {
+  const { to, type } = req.body;
+  const from = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -135,8 +157,10 @@ router.post('/:gameId/alliance/propose', (req, res) => {
   res.json(result);
 });
 
-router.post('/:gameId/alliance/respond', (req, res) => {
-  const { proposalId, faction, accept } = req.body;
+// Respond to alliance proposal - requires auth + faction ownership
+router.post('/:gameId/alliance/respond', requireAuth, requireFactionOwnership, (req, res) => {
+  const { proposalId, accept } = req.body;
+  const faction = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -155,9 +179,9 @@ router.post('/:gameId/alliance/respond', (req, res) => {
   res.json(result);
 });
 
-// Break alliance
-router.post('/:gameId/alliance/break', (req, res) => {
-  const { faction } = req.body;
+// Break alliance - requires auth + faction ownership
+router.post('/:gameId/alliance/break', requireAuth, requireFactionOwnership, (req, res) => {
+  const faction = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -177,9 +201,10 @@ router.post('/:gameId/alliance/break', (req, res) => {
   res.json(result);
 });
 
-// Use faction ability
-router.post('/:gameId/ability', (req, res) => {
-  const { faction, ability, params } = req.body;
+// Use faction ability - requires auth + faction ownership
+router.post('/:gameId/ability', requireAuth, requireFactionOwnership, (req, res) => {
+  const { ability, params } = req.body;
+  const faction = req.verifiedFaction;
   const game = games.get(req.params.gameId);
 
   if (!game) {
@@ -190,11 +215,16 @@ router.post('/:gameId/ability', (req, res) => {
   res.json(result);
 });
 
-// Check deadline and identify delinquent players
-router.post('/:gameId/check-deadline', async (req, res) => {
+// Check deadline and identify delinquent players (can be called by any player in game)
+router.post('/:gameId/check-deadline', requireAuth, attachUserFaction, async (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
+  }
+
+  // Must be a player in this game
+  if (!req.userFaction) {
+    return res.status(403).json({ error: 'You are not a player in this game' });
   }
 
   const result = game.checkDeadline();
@@ -204,24 +234,30 @@ router.post('/:gameId/check-deadline', async (req, res) => {
   if (result.expired) {
     const io = req.app.get('io');
     io.to(`game:${req.params.gameId}`).emit('deadline_expired', {
-      delinquentPlayers: result.delinquentPlayers
+      delinquentPlayers: result.delinquentPlayers,
     });
   }
 
   res.json(result);
 });
 
-// Vote to kick a delinquent player
-router.post('/:gameId/vote-kick', async (req, res) => {
+// Vote to kick a delinquent player - requires auth + faction ownership
+// Note: uses 'votingFaction' field as the faction
+router.post('/:gameId/vote-kick', requireAuth, async (req, res, next) => {
+  // Remap 'votingFaction' to 'faction' for the middleware
+  req.body.faction = req.body.votingFaction;
+  next();
+}, requireFactionOwnership, async (req, res) => {
   const game = games.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
-  const { votingFaction, targetFaction } = req.body;
+  const { targetFaction } = req.body;
+  const votingFaction = req.verifiedFaction;
 
-  if (!votingFaction || !targetFaction) {
-    return res.status(400).json({ error: 'Missing faction parameters' });
+  if (!targetFaction) {
+    return res.status(400).json({ error: 'Target faction required' });
   }
 
   const result = game.initiateKickVote(targetFaction, votingFaction);
@@ -233,7 +269,7 @@ router.post('/:gameId/vote-kick', async (req, res) => {
     targetFaction,
     votes: game.kickVotes[targetFaction] || [],
     kicked: result.kicked || false,
-    kickedPlayers: game.kickedPlayers
+    kickedPlayers: game.kickedPlayers,
   });
 
   res.json(result);

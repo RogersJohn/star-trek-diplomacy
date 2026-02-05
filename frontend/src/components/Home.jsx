@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
-import { useDevAuth } from '../hooks/useDevAuth'
+import { useUser, useAuth } from '@clerk/clerk-react'
 import { useGameStore } from '../hooks/useGameStore'
 
 const FACTIONS = [
@@ -14,44 +13,36 @@ const FACTIONS = [
   { id: 'gorn', name: 'Gorn Hegemony', color: 'gorn' },
 ]
 
-export default function Home({ devMode }) {
+export default function Home() {
   const navigate = useNavigate()
-
-  // Use appropriate auth based on mode
-  const clerkUser = devMode ? null : useUser()?.user;
-  const devAuth = devMode ? useDevAuth() : null;
-  const user = devMode ? devAuth?.user : clerkUser;
-
+  const { user } = useUser()
+  const { getToken } = useAuth()
   const { playerName, setPlayerName } = useGameStore()
   const [name, setName] = useState(playerName || user?.firstName || user?.username || '')
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
 
   const getAuthHeaders = async () => {
-    if (devMode) {
-      return { 'Content-Type': 'application/json' };
-    }
-    const token = await user?.getToken();
+    const token = await getToken()
     return {
       'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
-  };
+      'Authorization': `Bearer ${token}`,
+    }
+  }
 
   const handleCreateLobby = async () => {
-    const displayName = name.trim() || user?.firstName || user?.username || 'Player';
+    const displayName = name.trim() || user?.firstName || user?.username || 'Player'
 
     setPlayerName(displayName)
 
     try {
-      const headers = await getAuthHeaders();
+      const headers = await getAuthHeaders()
       const res = await fetch('/api/lobby/create', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           hostName: displayName,
-          userId: user?.id
-        })
+        }),
       })
 
       const data = await res.json()
@@ -67,7 +58,7 @@ export default function Home({ devMode }) {
   }
 
   const handleJoinLobby = async () => {
-    const displayName = name.trim() || user?.firstName || user?.username || 'Player';
+    const displayName = name.trim() || user?.firstName || user?.username || 'Player'
 
     if (!joinCode.trim()) {
       setError('Please enter a lobby code')
@@ -77,14 +68,13 @@ export default function Home({ devMode }) {
     setPlayerName(displayName)
 
     try {
-      const headers = await getAuthHeaders();
+      const headers = await getAuthHeaders()
       const res = await fetch(`/api/lobby/${joinCode}/join`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           playerName: displayName,
-          userId: user?.id
-        })
+        }),
       })
 
       const data = await res.json()

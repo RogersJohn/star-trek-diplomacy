@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useGameStore } from '../hooks/useGameStore';
+import { useAuth } from '@clerk/clerk-react';
+import { useGameStore, setAuthTokenGetter } from '../hooks/useGameStore';
 import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared';
 import GameMap from './map/GameMap';
 import OrderPanel from './OrderPanel';
@@ -11,90 +12,60 @@ import AlliancePanel from './AlliancePanel';
 
 export default function Game() {
   const { gameId } = useParams();
-  const { connect, joinGame, gameState, myState, faction, fetchGameState, fetchPlayerState } =
-    useGameStore();
+  const { getToken } = useAuth();
+  const {
+    connect,
+    joinGame,
+    gameState,
+    myState,
+    faction,
+    fetchGameState,
+    fetchPlayerState,
+    useAbility,
+    proposeAlliance,
+    respondToAlliance,
+  } = useGameStore();
 
-  const [selectedFaction, setSelectedFaction] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
-  const [kickVoteTarget, setKickVoteTarget] = useState(null);
 
   // Handle faction ability usage
   const handleUseAbility = async (abilityName, params) => {
-    try {
-      const response = await fetch(`/api/game/${gameId}/ability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ faction: selectedFaction, ability: abilityName, params }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Refresh game state after ability use
-        fetchGameState();
-        fetchPlayerState();
-      } else {
-        alert(result.reason || 'Failed to use ability');
-      }
-    } catch (error) {
-      console.error('Failed to use ability:', error);
-      alert('Failed to use ability');
+    const result = await useAbility(abilityName, params);
+    if (!result.success) {
+      alert(result.reason || 'Failed to use ability');
     }
   };
 
   // Handle alliance proposal
   const handleProposeAlliance = async (from, to, type) => {
-    try {
-      const response = await fetch(`/api/game/${gameId}/alliance/propose`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to, type }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        fetchGameState();
-        fetchPlayerState();
-      } else {
-        alert(result.reason || 'Failed to propose alliance');
-      }
-    } catch (error) {
-      console.error('Failed to propose alliance:', error);
-      alert('Failed to propose alliance');
+    const result = await proposeAlliance(to, type);
+    if (!result.success) {
+      alert(result.reason || 'Failed to propose alliance');
     }
   };
 
   // Handle alliance response
   const handleRespondToProposal = async (proposalId, faction, accept) => {
-    try {
-      const response = await fetch(`/api/game/${gameId}/alliance/respond`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalId, faction, accept }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        fetchGameState();
-        fetchPlayerState();
-      } else {
-        alert(result.reason || 'Failed to respond to proposal');
-      }
-    } catch (error) {
-      console.error('Failed to respond to proposal:', error);
-      alert('Failed to respond to proposal');
+    const result = await respondToAlliance(proposalId, accept);
+    if (!result.success) {
+      alert(result.reason || 'Failed to respond to proposal');
     }
   };
 
   // Handle break alliance
   const handleBreakAlliance = async (faction) => {
+    const { useGameStore } = await import('../hooks/useGameStore');
+    const state = useGameStore.getState();
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await getToken()}`,
+    };
+
     try {
       const response = await fetch(`/api/game/${gameId}/alliance/break`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ faction }),
       });
 
@@ -115,12 +86,17 @@ export default function Game() {
 
   // Handle vote to kick delinquent player
   const handleVoteKick = async (targetFaction) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await getToken()}`,
+    };
+
     try {
       const response = await fetch(`/api/game/${gameId}/vote-kick`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
-          votingFaction: selectedFaction,
+          votingFaction: faction,
           targetFaction,
         }),
       });
@@ -140,10 +116,15 @@ export default function Game() {
 
   // Check deadline status
   const handleCheckDeadline = async () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await getToken()}`,
+    };
+
     try {
       const response = await fetch(`/api/game/${gameId}/check-deadline`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
 
       await response.json();
@@ -153,34 +134,46 @@ export default function Game() {
     }
   };
 
+  // Initialize auth and connection
   useEffect(() => {
+    // Set the auth token getter for the store to use
+    setAuthTokenGetter(getToken);
+
+    // Connect to socket with auth
     connect();
 
-    // Get faction from URL params or localStorage
-    const params = new URLSearchParams(window.location.search);
-    const factionParam = params.get('faction') || localStorage.getItem(`game_${gameId}_faction`);
-
-    if (factionParam) {
-      setSelectedFaction(factionParam);
-      joinGame(gameId, factionParam);
-    }
+    // Join the game - server will determine our faction from the database
+    // Using a small delay to ensure socket is connected
+    const joinTimeout = setTimeout(() => {
+      joinGame(gameId);
+    }, 500);
 
     // Poll for updates (fallback if WebSocket fails)
     const interval = setInterval(() => {
       fetchGameState();
-      if (selectedFaction) fetchPlayerState();
-    }, 5000);
+      if (faction) fetchPlayerState();
+    }, 10000); // Reduced to 10s since we have WebSocket
 
-    return () => clearInterval(interval);
-  }, [gameId]);
+    return () => {
+      clearTimeout(joinTimeout);
+      clearInterval(interval);
+    };
+  }, [gameId, getToken]);
+
+  // Fetch player state when we learn our faction
+  useEffect(() => {
+    if (faction) {
+      fetchPlayerState();
+    }
+  }, [faction]);
 
   // Check if player is eliminated
   useEffect(() => {
-    if (gameState && selectedFaction) {
-      const eliminated = gameState.eliminated?.includes(selectedFaction) || false;
+    if (gameState && faction) {
+      const eliminated = gameState.eliminated?.includes(faction) || false;
       setIsEliminated(eliminated);
     }
-  }, [gameState, selectedFaction]);
+  }, [gameState, faction]);
 
   // Periodically check deadline during orders phase
   useEffect(() => {
@@ -205,12 +198,20 @@ export default function Game() {
     );
   }
 
+  if (!faction) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lcars-orange text-xl">Joining game...</div>
+      </div>
+    );
+  }
+
   // If game ended, show victory screen
   if (gameState.winner) {
     const winners = Array.isArray(gameState.winner.winners)
       ? gameState.winner.winners
       : [gameState.winner.winner];
-    const isWinner = winners.includes(selectedFaction);
+    const isWinner = winners.includes(faction);
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-space-dark to-gray-900">
@@ -292,7 +293,7 @@ export default function Game() {
                         style={{ backgroundColor: FACTION_COLORS[f] }}
                       />
                       <span
-                        className={f === selectedFaction ? 'text-white font-bold' : 'text-gray-400'}
+                        className={f === faction ? 'text-white font-bold' : 'text-gray-400'}
                       >
                         {FACTION_NAMES[f]}
                       </span>
@@ -317,17 +318,17 @@ export default function Game() {
   return (
     <div className="h-screen flex flex-col">
       {/* Status Bar */}
-      <StatusBar gameState={gameState} myState={myState} faction={selectedFaction} />
+      <StatusBar gameState={gameState} myState={myState} faction={faction} />
 
       {/* Faction Ability Panel */}
-      {selectedFaction && myState && !gameState?.winner && (
+      {faction && myState && !gameState?.winner && (
         <div className="px-4 pt-4">
           <FactionAbilityPanel gameState={myState} onUseAbility={handleUseAbility} />
         </div>
       )}
 
       {/* Alliance Panel */}
-      {selectedFaction && myState && !gameState?.winner && (
+      {faction && myState && !gameState?.winner && (
         <div className="px-4 pt-4">
           <AlliancePanel
             gameState={gameState}
@@ -350,44 +351,44 @@ export default function Game() {
               The following players have not submitted orders:
             </p>
             <div className="flex flex-wrap gap-2 mb-4">
-              {gameState.delinquentPlayers.map((faction) => (
+              {gameState.delinquentPlayers.map((f) => (
                 <span
-                  key={faction}
+                  key={f}
                   className="px-3 py-1 rounded text-sm font-bold text-white"
-                  style={{ backgroundColor: FACTION_COLORS[faction] }}
+                  style={{ backgroundColor: FACTION_COLORS[f] }}
                 >
-                  {FACTION_NAMES[faction]}
-                  {gameState.kickedPlayers?.includes(faction) && ' (Kicked)'}
+                  {FACTION_NAMES[f]}
+                  {gameState.kickedPlayers?.includes(f) && ' (Kicked)'}
                 </span>
               ))}
             </div>
 
             {/* Kick Vote UI - only show if player can vote */}
-            {selectedFaction &&
-              !gameState.kickedPlayers?.includes(selectedFaction) &&
-              !gameState.eliminated?.includes(selectedFaction) && (
+            {faction &&
+              !gameState.kickedPlayers?.includes(faction) &&
+              !gameState.eliminated?.includes(faction) && (
                 <div className="bg-gray-800/50 rounded-lg p-3 mt-3">
                   <h4 className="text-lcars-tan text-sm font-bold mb-2">Vote to Kick</h4>
                   {gameState.delinquentPlayers
                     .filter((f) => !gameState.kickedPlayers?.includes(f))
-                    .map((faction) => {
-                      const votes = gameState.kickVotes?.[faction] || [];
-                      const hasVoted = votes.includes(selectedFaction);
-                      const isSelf = faction === selectedFaction;
+                    .map((targetFaction) => {
+                      const votes = gameState.kickVotes?.[targetFaction] || [];
+                      const hasVoted = votes.includes(faction);
+                      const isSelf = targetFaction === faction;
 
                       return (
                         <div
-                          key={faction}
+                          key={targetFaction}
                           className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
                         >
-                          <span className="font-bold" style={{ color: FACTION_COLORS[faction] }}>
-                            {FACTION_NAMES[faction]}
+                          <span className="font-bold" style={{ color: FACTION_COLORS[targetFaction] }}>
+                            {FACTION_NAMES[targetFaction]}
                           </span>
                           <div className="flex items-center gap-3">
                             <span className="text-gray-400 text-sm">{votes.length} vote(s)</span>
                             {!isSelf && !hasVoted && (
                               <button
-                                onClick={() => handleVoteKick(faction)}
+                                onClick={() => handleVoteKick(targetFaction)}
                                 className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded font-bold"
                               >
                                 Vote Kick
@@ -411,7 +412,7 @@ export default function Game() {
       )}
 
       {/* Kicked Player Banner */}
-      {gameState?.kickedPlayers?.includes(selectedFaction) && (
+      {gameState?.kickedPlayers?.includes(faction) && (
         <div className="bg-orange-900 border-b-2 border-orange-500 px-4 py-2 text-center">
           <span className="text-orange-200 font-bold">
             ⚠ You have been kicked - Your units will auto-hold each turn
@@ -432,7 +433,7 @@ export default function Game() {
       <div className="flex-1 flex relative overflow-hidden">
         {/* Map */}
         <div className="flex-1 relative">
-          <GameMap gameState={gameState} faction={selectedFaction} />
+          <GameMap gameState={gameState} faction={faction} />
 
           {/* Turn History Button */}
           <button
@@ -501,14 +502,14 @@ export default function Game() {
         <OrderPanel
           gameState={gameState}
           myState={myState}
-          faction={selectedFaction}
+          faction={faction}
           disabled={isEliminated}
         />
       </div>
 
       {/* Messages Panel */}
-      {selectedFaction && !gameState?.winner && (
-        <Messages gameState={gameState} faction={selectedFaction} />
+      {faction && !gameState?.winner && (
+        <Messages gameState={gameState} faction={faction} />
       )}
     </div>
   );
