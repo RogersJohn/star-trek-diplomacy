@@ -12,6 +12,7 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev": "npm run dev:backend & npm run dev:frontend",
     "build": "npm run build --workspace=frontend",
-    "test": "npm test --workspace=backend"
+    "test": "npm test --workspace=backend",
+    "test:docker": "docker compose -f e2e-tests/docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from integration-tests"
   }
 }

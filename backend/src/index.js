@@ -15,6 +15,7 @@ const { clerkClient } = require('@clerk/clerk-sdk-node');
 const gameRoutes = require('./api/game-routes');
 const lobbyRoutes = require('./api/lobby-routes');
 const userRoutes = require('./api/user-routes');
+const testRoutes = require('./api/test-routes');
 const GameManager = require('./game-manager');
 const { games } = require('./api/game-routes');
 const { initializeDatabase, closeDatabase, getUserFactionInGame } = require('./database');
@@ -41,6 +42,7 @@ app.get('/health', (req, res) => {
 app.use('/api/game', gameRoutes);
 app.use('/api/lobby', lobbyRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/test', testRoutes);
 
 // Socket.io authentication middleware
 io.use(async (socket, next) => {

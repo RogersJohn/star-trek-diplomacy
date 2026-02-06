@@ -230,4 +230,5 @@ const FACTION_NAMES = {
     gorn: 'Gorn Hegemony'
 };
 
+// CommonJS exports — Vite handles CJS→ESM for the frontend automatically
 module.exports = { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS, FACTION_NAMES };
