@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useGameStore } from '../../hooks/useGameStore'
 import { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS } from '@star-trek-diplomacy/shared'
 
 export default function GameMap({ gameState, faction }) {
-  const { selectedUnit, selectUnit, addOrder, pendingOrders } = useGameStore()
+  const { selectedUnit, selectUnit, addOrder, pendingOrders, clearOrders } = useGameStore()
   const [hoveredSystem, setHoveredSystem] = useState(null)
   const [viewMode, setViewMode] = useState('2d')
   const [orderMode, setOrderMode] = useState('move') // 'move', 'support', 'hold'
@@ -105,10 +105,25 @@ export default function GameMap({ gameState, faction }) {
     return getValidDestinations().includes(systemId)
   }
   
+  // Clear pending orders and selection when phase changes
+  const prevPhaseRef = useRef(gameState?.phase)
+  useEffect(() => {
+    if (gameState?.phase && gameState.phase !== prevPhaseRef.current) {
+      prevPhaseRef.current = gameState.phase
+      clearOrders()
+      selectUnit(null)
+      setSupportTarget(null)
+      setOrderMode('move')
+    }
+  }, [gameState?.phase])
+
   // Handle system click
   const handleSystemClick = (systemId) => {
+    // Only allow map-based ordering during the orders phase
+    if (gameState?.phase !== 'orders') return
+
     const unit = getUnit(systemId)
-    
+
     if (orderMode === 'support') {
       if (!selectedUnit) {
         // First click: select unit giving support

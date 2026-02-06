@@ -110,7 +110,54 @@ export const useGameStore = create((set, get) => ({
       socket.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason);
         set({ connected: false });
-        // Auto-reconnect handled by socket.io unless server disconnected
+      });
+
+      socket.on('error', ({ message }) => {
+        console.error('Socket error:', message);
+      });
+
+      socket.on('joined_game', ({ gameId, faction }) => {
+        set({ faction });
+      });
+
+      socket.on('game_state_update', (state) => {
+        set({ gameState: state });
+      });
+
+      socket.on('phase_resolved', () => {
+        get().fetchGameState();
+        get().fetchPlayerState();
+      });
+
+      socket.on('player_ready', () => {
+        get().fetchGameState();
+      });
+
+      socket.on('orders_submitted', () => {
+        get().fetchGameState();
+      });
+
+      socket.on('alliance_proposed', () => {
+        get().fetchGameState();
+        get().fetchPlayerState();
+      });
+
+      socket.on('alliance_formed', () => {
+        get().fetchGameState();
+        get().fetchPlayerState();
+      });
+
+      socket.on('alliance_broken', () => {
+        get().fetchGameState();
+        get().fetchPlayerState();
+      });
+
+      socket.on('private_message', () => {
+        get().fetchPlayerState();
+      });
+
+      socket.on('broadcast_message', () => {
+        get().fetchPlayerState();
       });
 
       set({ socket });
@@ -121,71 +168,10 @@ export const useGameStore = create((set, get) => ({
   },
 
   reconnect: async () => {
-    const { socket, disconnect } = get();
-    if (socket) {
-      disconnect();
-    }
-    // Small delay before reconnecting
+    const { disconnect } = get();
+    disconnect();
     await new Promise(resolve => setTimeout(resolve, 500));
     get().connect();
-
-    socket.on('error', ({ message }) => {
-      console.error('Socket error:', message);
-    })
-
-    socket.on('joined_game', ({ gameId, faction }) => {
-      // Server confirmed we joined and told us our faction
-      set({ faction })
-    })
-
-    socket.on('game_state_update', (state) => {
-      set({ gameState: state })
-    })
-
-    socket.on('phase_resolved', (results) => {
-      // Refresh game state
-      get().fetchGameState()
-    })
-
-    socket.on('player_ready', ({ faction }) => {
-      // Refresh to show who has submitted
-      get().fetchGameState()
-    })
-
-    socket.on('orders_submitted', ({ faction }) => {
-      // Refresh to show who has submitted
-      get().fetchGameState()
-    })
-
-    socket.on('alliance_proposed', ({ to, proposalId }) => {
-      get().fetchGameState()
-      get().fetchPlayerState()
-    })
-
-    socket.on('alliance_formed', () => {
-      get().fetchGameState()
-      get().fetchPlayerState()
-    })
-
-    socket.on('alliance_broken', ({ betrayer, betrayed }) => {
-      get().fetchGameState()
-      get().fetchPlayerState()
-    })
-
-    socket.on('private_message', (msg) => {
-      // Handle incoming private message
-      const { myState } = get();
-      if (myState) {
-        // Trigger a re-render or update messages state
-        get().fetchPlayerState()
-      }
-    })
-
-    socket.on('broadcast_message', (msg) => {
-      get().fetchPlayerState()
-    })
-
-    set({ socket })
   },
 
   disconnect: () => {

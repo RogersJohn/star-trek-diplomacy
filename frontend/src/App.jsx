@@ -1,11 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { SignIn, SignUp, useUser, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from '@clerk/clerk-react'
 import Home from './components/Home'
 import Lobby from './components/Lobby'
 import Game from './components/Game'
 
 function App() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isLoaded } = useUser();
 
   if (!isLoaded) {
     return (
@@ -18,28 +18,33 @@ function App() {
   return (
     <div className="min-h-screen bg-space-dark text-white">
       {/* User Button in top right */}
-      {isSignedIn && (
+      <SignedIn>
         <div className="absolute top-4 right-4 z-50">
-          <UserButton afterSignOutUrl="/" />
+          <UserButton />
         </div>
-      )}
+      </SignedIn>
 
-      <Routes>
-        <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
-        <Route path="/sign-up/*" element={<SignUp routing="path" path="/sign-up" />} />
-        <Route
-          path="/"
-          element={isSignedIn ? <Home /> : <Navigate to="/sign-in" />}
-        />
-        <Route
-          path="/lobby/:lobbyId"
-          element={isSignedIn ? <Lobby /> : <Navigate to="/sign-in" />}
-        />
-        <Route
-          path="/game/:gameId"
-          element={isSignedIn ? <Game /> : <Navigate to="/sign-in" />}
-        />
-      </Routes>
+      {/* Show sign in button when not authenticated */}
+      <SignedOut>
+        <div className="flex flex-col items-center justify-center min-h-screen">
+          <h1 className="text-4xl font-bold text-lcars-orange mb-8">Star Trek Diplomacy</h1>
+          <p className="text-xl mb-8">Sign in to start playing</p>
+          <SignInButton mode="modal">
+            <button className="lcars-button text-xl px-8 py-4">
+              Sign In
+            </button>
+          </SignInButton>
+        </div>
+      </SignedOut>
+
+      <SignedIn>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/lobby/:lobbyId" element={<Lobby />} />
+          <Route path="/game/:gameId" element={<Game />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </SignedIn>
     </div>
   )
 }
