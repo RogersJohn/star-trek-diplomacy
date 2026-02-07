@@ -230,5 +230,20 @@ const FACTION_NAMES = {
     gorn: 'Gorn Hegemony'
 };
 
+/**
+ * Generate canonical edge IDs from hyperlane pairs
+ */
+const EDGES = HYPERLANES.map(([a, b]) => [a, b].sort().join('~'));
+
+/**
+ * Vertical lane edges (between layers)
+ */
+const VERTICAL_EDGES = VERTICAL_LANES.map(({ from, to }) => [from, to].sort().join('~'));
+
+/**
+ * All edges (horizontal + vertical)
+ */
+const ALL_EDGES = [...new Set([...EDGES, ...VERTICAL_EDGES])];
+
 // CommonJS exports — Vite handles CJS→ESM for the frontend automatically
-module.exports = { SYSTEMS, HYPERLANES, VERTICAL_LANES, FACTION_COLORS, FACTION_NAMES };
+module.exports = { SYSTEMS, HYPERLANES, VERTICAL_LANES, EDGES, VERTICAL_EDGES, ALL_EDGES, FACTION_COLORS, FACTION_NAMES };
