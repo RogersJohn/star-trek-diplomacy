@@ -13,12 +13,12 @@ const {
   initializeMapData,
   FACTIONS,
   VICTORY_CONDITIONS,
-  getAdjacent,
+  getValidDestinations,
 } = require('./engine/diplomacy-engine');
 const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('@star-trek-diplomacy/shared');
 const { LatinumEconomy, AbilityManager, FACTION_ABILITIES } = require('./engine/faction-abilities');
 const { AllianceManager } = require('./engine/alliance-system');
-const { saveGame, saveMessage, getActiveGames } = require('./database');
+const { saveGame, getActiveGames } = require('./database');
 
 class GameManager {
   constructor(gameId, playerFactions, settings = {}) {
@@ -278,10 +278,10 @@ class GameManager {
           returnTo: resilience.returnTo
         });
         if (resilience.survived) {
-          this.state.units[resilience.returnTo] = {
+          this.state.placeUnit(resilience.returnTo, {
             faction: 'gorn',
             type: dislodged.type,
-          };
+          });
           delete this.state.dislodged[location];
           results.push({
             type: 'gorn_survived',
@@ -371,10 +371,10 @@ class GameManager {
       if (dislodged.faction === 'gorn') {
         const resilience = this.abilities.checkGornResilience('gorn', loc);
         if (resilience.survived) {
-          this.state.units[resilience.returnTo] = {
+          this.state.placeUnit(resilience.returnTo, {
             faction: 'gorn',
             type: dislodged.type,
-          };
+          });
           results.push({
             type: 'gorn_survived',
             from: loc,
@@ -572,10 +572,14 @@ class GameManager {
    * Get available moves for a location
    */
   getAvailableMoves(location) {
-    const unit = this.state.units[location];
+    const unitOrArray = this.state.units[location];
+    if (!unitOrArray) return [];
+
+    // Edge positions store arrays; planets/orbits store single units
+    const unit = Array.isArray(unitOrArray) ? unitOrArray[0] : unitOrArray;
     if (!unit) return [];
 
-    return getAdjacent(location);
+    return getValidDestinations(location, unit.type);
   }
 
   /**
@@ -624,34 +628,6 @@ class GameManager {
    */
   getHistory() {
     return this.history;
-  }
-
-  /**
-   * Add a message
-   */
-  async addMessage(from, to, content, isPublic = false) {
-    const message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      from,
-      to: isPublic ? 'all' : to,
-      content,
-      timestamp: new Date().toISOString(),
-      turn: this.state.turn,
-    };
-
-    this.messages.push(message);
-
-    // Save message to database
-    await saveMessage(this.gameId, from, isPublic ? null : to, content);
-
-    return message;
-  }
-
-  /**
-   * Get messages for a faction
-   */
-  getMessages(faction) {
-    return this.messages.filter(m => m.from === faction || m.to === faction || m.to === 'all');
   }
 
   /**
@@ -754,7 +730,7 @@ class GameManager {
     const units = this.state.getUnits(faction);
     const holdOrders = units.map(unit => ({
       type: 'hold',
-      location: unit.location,
+      location: unit.position,
       faction: faction
     }));
 

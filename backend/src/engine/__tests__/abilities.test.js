@@ -47,8 +47,8 @@ describe('Federation Diplomatic Immunity', () => {
         // Set up: Klingon with attack bonus attacks Federation at earth from betazed (adjacent)
         // Without protection, Klingon with +1 attack bonus (strength 2) beats Federation hold (strength 1)
         state.units = {
-            'earth': { faction: 'federation', type: 'fleet' },
-            'betazed': { faction: 'klingon', type: 'fleet' }
+            'earth': { faction: 'federation', type: 'army' },
+            'betazed': { faction: 'klingon', type: 'army' }
         };
 
         abilities.useDiplomaticImmunity('federation', 'earth');
@@ -105,7 +105,7 @@ describe('Breen Freeze Territory', () => {
 
     test('validator blocks moves out of frozen territory', () => {
         // earth and vulcan are adjacent
-        state.units['earth'] = { faction: 'federation', type: 'fleet' };
+        state.units['earth'] = { faction: 'federation', type: 'army' };
         abilities.freezeTerritory('earth');
 
         const validator = new OrderValidator(state);
@@ -124,7 +124,7 @@ describe('Breen Freeze Territory', () => {
 
     test('validator blocks moves into frozen territory', () => {
         // vulcan and earth are adjacent
-        state.units['vulcan'] = { faction: 'federation', type: 'fleet' };
+        state.units['vulcan'] = { faction: 'federation', type: 'army' };
         abilities.freezeTerritory('earth');
 
         const validator = new OrderValidator(state);
@@ -243,9 +243,9 @@ describe('Ferengi Sabotage', () => {
     test('adjudicator ignores sabotaged support', () => {
         // Set up scenario where support would normally help
         state.units = {
-            'earth': { faction: 'federation', type: 'fleet' },
-            'vulcan': { faction: 'federation', type: 'fleet' },
-            'qonos': { faction: 'klingon', type: 'fleet' }
+            'earth': { faction: 'federation', type: 'army' },
+            'vulcan': { faction: 'federation', type: 'army' },
+            'qonos': { faction: 'klingon', type: 'army' }
         };
 
         abilities.sabotageSupport('federation', 'vulcan');

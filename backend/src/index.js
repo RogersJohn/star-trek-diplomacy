@@ -108,53 +108,6 @@ io.on('connection', socket => {
     console.log(`${socket.id} joined lobby ${lobbyId}`);
   });
 
-  // Private message - SECURITY: verify sender, only emit to sender + recipient
-  socket.on('private_message', ({ to, message, timestamp }) => {
-    const senderInfo = socketRegistry.get(socket.id);
-    if (!senderInfo) {
-      socket.emit('error', { message: 'Not authenticated to a game' });
-      return;
-    }
-
-    const { gameId, faction: from } = senderInfo;
-    const msgTimestamp = timestamp || Date.now();
-
-    // Get recipient sockets
-    const recipientSockets = getSocketsForFaction(gameId, to);
-
-    // Get sender's other sockets (multi-tab support)
-    const senderSockets = getSocketsForFaction(gameId, from);
-
-    // Create the message object
-    const privateMsg = { from, to, message, timestamp: msgTimestamp };
-
-    // Emit only to sender and recipient sockets
-    [...new Set([...senderSockets, ...recipientSockets])].forEach(socketId => {
-      io.to(socketId).emit('private_message', privateMsg);
-    });
-
-    console.log(`Private message from ${from} to ${to}`);
-  });
-
-  // Broadcast message - SECURITY: use authenticated faction as sender
-  socket.on('broadcast_message', ({ message, timestamp }) => {
-    const senderInfo = socketRegistry.get(socket.id);
-    if (!senderInfo) {
-      socket.emit('error', { message: 'Not authenticated to a game' });
-      return;
-    }
-
-    const { gameId, faction: from } = senderInfo;
-
-    io.to(`game:${gameId}`).emit('broadcast_message', {
-      from,
-      to: 'all',
-      message,
-      timestamp: timestamp || Date.now(),
-    });
-    console.log(`Broadcast message from ${from}`);
-  });
-
   // Broadcast order submission - SECURITY: use authenticated faction
   socket.on('order_submitted', () => {
     const senderInfo = socketRegistry.get(socket.id);
