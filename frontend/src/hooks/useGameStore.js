@@ -152,14 +152,6 @@ export const useGameStore = create((set, get) => ({
         get().fetchPlayerState();
       });
 
-      socket.on('private_message', () => {
-        get().fetchPlayerState();
-      });
-
-      socket.on('broadcast_message', () => {
-        get().fetchPlayerState();
-      });
-
       set({ socket });
     } catch (err) {
       console.error('Failed to connect:', err);
@@ -424,22 +416,6 @@ export const useGameStore = create((set, get) => ({
     } catch (err) {
       console.error('Failed to use ability:', err)
       return { success: false, error: err.message }
-    }
-  },
-
-  sendMessage: (to, content) => {
-    const { socket } = get()
-    if (socket) {
-      // Server uses authenticated faction from socket.data - no need to send from
-      socket.emit('private_message', { to, message: content })
-    }
-  },
-
-  broadcastMessage: (content) => {
-    const { socket } = get()
-    if (socket) {
-      // Server uses authenticated faction from socket.data
-      socket.emit('broadcast_message', { message: content })
     }
   },
 

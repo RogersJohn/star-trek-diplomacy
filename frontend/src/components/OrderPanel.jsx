@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../hooks/useGameStore';
-import { FACTION_NAMES, SYSTEMS } from '@star-trek-diplomacy/shared';
+import { FACTION_NAMES } from '@star-trek-diplomacy/shared';
+import { formatPosition } from '../utils/position-display';
 
 export default function OrderPanel({ gameState, myState, faction, disabled = false }) {
   const { pendingOrders, removeOrder, clearOrders, submitOrders, submitRetreats, submitBuilds, addOrder } = useGameStore();
@@ -22,6 +23,12 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
     gameState?.eliminated ? !gameState.eliminated.includes(f) : true
   );
 
+  // Sort units: armies first, then fleets
+  const sortedUnits = [...myUnits].sort((a, b) => {
+    if (a.type === b.type) return (a.position || '').localeCompare(b.position || '');
+    return a.type === 'army' ? -1 : 1;
+  });
+
   const handleSubmit = async () => {
     setShowConfirm(false)
     let result;
@@ -36,7 +43,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
       alert(result.error || 'Failed to submit');
     }
   };
-  
+
   const handleSubmitClick = () => {
     if (pendingOrders.length > 0) {
       setShowConfirm(true)
@@ -46,11 +53,12 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
   // Add hold orders for units without orders
   const handleAddHolds = () => {
     myUnits.forEach(unit => {
-      const hasOrder = pendingOrders.some(o => o.location === unit.location);
+      const pos = unit.position;
+      const hasOrder = pendingOrders.some(o => o.location === pos);
       if (!hasOrder) {
         addOrder({
           type: 'hold',
-          location: unit.location,
+          location: pos,
         });
       }
     });
@@ -67,7 +75,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
           </div>
         </div>
       )}
-      
+
       {/* Header */}
       <div className="mb-4">
         <h2 className="lcars-header">Orders</h2>
@@ -84,15 +92,17 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
         <div className="mb-4">
           <h3 className="text-lcars-tan text-sm mb-2">Your Units ({myUnits.length})</h3>
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {myUnits.map(unit => {
-              const hasOrder = pendingOrders.some(o => o.location === unit.location);
+            {sortedUnits.map(unit => {
+              const pos = unit.position;
+              const hasOrder = pendingOrders.some(o => o.location === pos);
+              const prefix = unit.type === 'fleet' ? 'F' : 'A';
               return (
                 <div
-                  key={unit.location}
+                  key={pos}
                   className={`text-sm px-2 py-1 rounded ${hasOrder ? 'bg-green-900/30' : 'bg-gray-800'}`}
                 >
-                  {unit.type === 'fleet' ? '🚀' : '⚔️'} {unit.location}
-                  {hasOrder && <span className="text-green-400 ml-2">✓</span>}
+                  {prefix} {formatPosition(pos)}
+                  {hasOrder && <span className="text-green-400 ml-2">&#10003;</span>}
                 </div>
               );
             })}
@@ -121,12 +131,14 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
                 className="flex items-center justify-between bg-gray-800 px-2 py-1 rounded text-sm"
               >
                 <span>
-                  {order.location}
-                  <span className="text-lcars-blue mx-1">→</span>
-                  {order.type === 'hold' ? 'HOLD' : order.destination}
+                  {formatPosition(order.location)}
+                  <span className="text-lcars-blue mx-1">{'\u2192'}</span>
+                  {order.type === 'hold' ? 'HOLD' : formatPosition(order.destination)}
+                  {order.type === 'support' && ` (support ${formatPosition(order.target)})`}
+                  {order.type === 'convoy' && ' (convoy)'}
                 </span>
                 <button onClick={() => removeOrder(i)} className="text-red-400 hover:text-red-300">
-                  ×
+                  {'\u00d7'}
                 </button>
               </div>
             ))}
@@ -162,14 +174,14 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
               }`}
           >
             {submitted
-              ? '✓ Orders Submitted'
+              ? '\u2713 Orders Submitted'
               : phase === 'retreats'
                 ? 'Submit Retreats'
                 : phase === 'builds'
                   ? 'Submit Builds'
                   : 'Submit Orders'}
           </button>
-          
+
           {/* Confirmation Dialog */}
           {showConfirm && (
             <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -180,15 +192,16 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
                   <div className="bg-gray-800 rounded p-3 max-h-48 overflow-y-auto space-y-1">
                     {pendingOrders.map((order, i) => (
                       <div key={i} className="text-sm text-gray-300">
-                        • {SYSTEMS[order.location]?.name || order.location}
+                        {'\u2022'} {formatPosition(order.location)}
                         {order.type === 'hold' && ' - HOLD'}
-                        {order.destination && ` → ${SYSTEMS[order.destination]?.name || order.destination}`}
-                        {order.type === 'support' && ` (supporting ${order.target})`}
+                        {order.destination && ` \u2192 ${formatPosition(order.destination)}`}
+                        {order.type === 'support' && ` (supporting ${formatPosition(order.target)})`}
+                        {order.type === 'convoy' && ' (convoy)'}
                       </div>
                     ))}
                   </div>
                   <p className="text-yellow-400 text-sm mt-3">
-                    ⚠ Once submitted, you cannot change your orders this turn.
+                    Warning: Once submitted, you cannot change your orders this turn.
                   </p>
                 </div>
                 <div className="flex gap-3">
@@ -225,9 +238,9 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
                 </span>
                 <span>
                   {gameState?.ordersSubmitted?.includes(f) ? (
-                    <span className="text-green-400">✓ Ready</span>
+                    <span className="text-green-400">{'\u2713'} Ready</span>
                   ) : (
-                    <span className="text-yellow-400">⏳ Pending</span>
+                    <span className="text-yellow-400">{'\u23f3'} Pending</span>
                   )}
                 </span>
               </div>
@@ -243,7 +256,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
           <div className="space-y-2 max-h-64 overflow-y-auto bg-gray-800 p-2 rounded text-xs">
             {gameState.lastResolution.moves?.map((move, i) => (
               <div key={i} className={move.success ? 'text-green-400' : 'text-red-400'}>
-                {move.success ? '✓' : '✗'} {move.from} → {move.to}
+                {move.success ? '\u2713' : '\u2717'} {formatPosition(move.from)} {'\u2192'} {formatPosition(move.to)}
                 {!move.success && move.reason && (
                   <div className="text-gray-400 text-xs ml-4">{move.reason}</div>
                 )}
@@ -251,7 +264,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
             ))}
             {gameState.lastResolution.dislodged?.length > 0 && (
               <div className="text-yellow-400 mt-2">
-                ⚠ Dislodged: {gameState.lastResolution.dislodged.join(', ')}
+                Dislodged: {gameState.lastResolution.dislodged.map(d => formatPosition(d)).join(', ')}
               </div>
             )}
           </div>
@@ -265,9 +278,9 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
           <div className="space-y-2">
             {myState.myDislodged.map((unit, i) => (
               <div key={i} className="bg-red-900/30 p-2 rounded">
-                <div className="text-sm mb-1">{unit.location}</div>
+                <div className="text-sm mb-1">{formatPosition(unit.position || unit.location)}</div>
                 <div className="text-xs text-gray-400 mb-2">
-                  Retreat to: {unit.retreatOptions?.join(', ') || 'None - must disband'}
+                  Retreat to: {unit.retreatOptions?.map(o => formatPosition(o)).join(', ') || 'None - must disband'}
                 </div>
                 {unit.retreatOptions?.length > 0 && (
                   <select
@@ -275,7 +288,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
                     onChange={e =>
                       addOrder({
                         type: 'retreat',
-                        location: unit.location,
+                        location: unit.position || unit.location,
                         destination: e.target.value,
                       })
                     }
@@ -283,7 +296,7 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
                     <option value="">Select retreat...</option>
                     {unit.retreatOptions.map(opt => (
                       <option key={opt} value={opt}>
-                        {opt}
+                        {formatPosition(opt)}
                       </option>
                     ))}
                     <option value="disband">Disband unit</option>
@@ -305,37 +318,76 @@ export default function OrderPanel({ gameState, myState, faction, disabled = fal
           </h3>
           {myState.buildCount > 0 && (
             <div className="space-y-2">
-              <div className="text-xs text-gray-400 mb-2">Build in home centers:</div>
-              {myState.buildLocations?.map(loc => (
-                <div key={loc} className="flex gap-2">
-                  <button
-                    onClick={() => addOrder({ type: 'build', location: loc, unitType: 'army' })}
-                    className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
-                  >
-                    Build Army @ {loc}
-                  </button>
-                  <button
-                    onClick={() => addOrder({ type: 'build', location: loc, unitType: 'fleet' })}
-                    className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
-                  >
-                    Build Fleet @ {loc}
-                  </button>
+              {/* Army build locations */}
+              {(myState.buildLocations?.armies || []).length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Build Armies:</div>
+                  {myState.buildLocations.armies.map(loc => (
+                    <button
+                      key={`army-${loc}`}
+                      onClick={() => addOrder({ type: 'build', location: loc, unitType: 'army' })}
+                      className="w-full bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs mb-1"
+                    >
+                      A {formatPosition(loc)}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
+              {/* Fleet build locations */}
+              {(myState.buildLocations?.fleets || []).length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Build Fleets:</div>
+                  {myState.buildLocations.fleets.map(loc => (
+                    <button
+                      key={`fleet-${loc}`}
+                      onClick={() => addOrder({ type: 'build', location: loc, unitType: 'fleet' })}
+                      className="w-full bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs mb-1"
+                    >
+                      F {formatPosition(loc)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Fallback for v1 flat array format */}
+              {myState.buildLocations && !myState.buildLocations.armies && !myState.buildLocations.fleets && Array.isArray(myState.buildLocations) && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-2">Build in home centers:</div>
+                  {myState.buildLocations.map(loc => (
+                    <div key={loc} className="flex gap-2 mb-1">
+                      <button
+                        onClick={() => addOrder({ type: 'build', location: loc, unitType: 'army' })}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
+                      >
+                        A {formatPosition(loc)}
+                      </button>
+                      <button
+                        onClick={() => addOrder({ type: 'build', location: loc, unitType: 'fleet' })}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs"
+                      >
+                        F {formatPosition(loc)}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {myState.buildCount < 0 && (
             <div className="space-y-1">
               <div className="text-xs text-gray-400 mb-2">Select units to disband:</div>
-              {myUnits.map(unit => (
-                <button
-                  key={unit.location}
-                  onClick={() => addOrder({ type: 'disband', location: unit.location })}
-                  className="w-full bg-gray-700 hover:bg-red-600 rounded px-2 py-1 text-xs text-left"
-                >
-                  Disband {unit.type} @ {unit.location}
-                </button>
-              ))}
+              {sortedUnits.map(unit => {
+                const pos = unit.position;
+                const prefix = unit.type === 'fleet' ? 'F' : 'A';
+                return (
+                  <button
+                    key={pos}
+                    onClick={() => addOrder({ type: 'disband', location: pos })}
+                    className="w-full bg-gray-700 hover:bg-red-600 rounded px-2 py-1 text-xs text-left"
+                  >
+                    Disband {prefix} {formatPosition(pos)}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

@@ -6,7 +6,6 @@ import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared';
 import GameMap from './map/GameMap';
 import OrderPanel from './OrderPanel';
 import StatusBar from './StatusBar';
-import Messages from './Messages';
 import FactionAbilityPanel from './FactionAbilityPanel';
 import AlliancePanel from './AlliancePanel';
 
@@ -507,10 +506,6 @@ export default function Game() {
         />
       </div>
 
-      {/* Messages Panel */}
-      {faction && !gameState?.winner && (
-        <Messages gameState={gameState} faction={faction} />
-      )}
     </div>
   );
 }

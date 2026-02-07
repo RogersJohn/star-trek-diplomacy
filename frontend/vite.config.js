@@ -7,6 +7,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      commonjsOptions: {
+        include: [/shared/, /node_modules/],
+        transformMixedEsModules: true,
+      },
+    },
+    optimizeDeps: {
+      include: ['@star-trek-diplomacy/shared'],
+    },
     server: {
       port: 5173,
       host: true,
