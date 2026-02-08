@@ -1,8 +1,8 @@
 # Star Trek Diplomacy - Official Rules
 
-**Version 1.0**
+**Version 2.0**
 
-A 7-player strategy game of interstellar conquest and negotiation set in the Star Trek universe. Based on classic Diplomacy mechanics with asymmetric faction abilities.
+A 7-player strategy game of interstellar conquest and negotiation set in the Star Trek universe. Based on classic Diplomacy mechanics with dual-unit system, asymmetric faction abilities, and a 3-layer map.
 
 ---
 
@@ -11,15 +11,17 @@ A 7-player strategy game of interstellar conquest and negotiation set in the Sta
 1. [Overview](#overview)
 2. [Factions](#factions)
 3. [The Map](#the-map)
-4. [Turn Structure](#turn-structure)
-5. [Orders](#orders)
-6. [Order Resolution](#order-resolution)
-7. [Retreats](#retreats)
-8. [Builds and Disbands](#builds-and-disbands)
-9. [Victory Conditions](#victory-conditions)
-10. [Alliances](#alliances)
-11. [Faction Abilities](#faction-abilities)
-12. [Latinum Economy](#latinum-economy)
+4. [Units](#units)
+5. [Positions](#positions)
+6. [Turn Structure](#turn-structure)
+7. [Orders](#orders)
+8. [Order Resolution](#order-resolution)
+9. [Retreats](#retreats)
+10. [Builds and Disbands](#builds-and-disbands)
+11. [Victory Conditions](#victory-conditions)
+12. [Alliances](#alliances)
+13. [Faction Abilities](#faction-abilities)
+14. [Latinum Economy](#latinum-economy)
 
 ---
 
@@ -31,43 +33,85 @@ Star Trek Diplomacy is a game of negotiation, strategy, and careful timing. Seve
 - All orders are submitted simultaneously and resolved together
 - Combat is deterministic - the side with more support wins
 - Equal forces result in a standoff (no movement)
-- Negotiation happens outside the game system - promises are not binding
+- Negotiation happens outside the game (Discord, WhatsApp, etc.) - promises are not binding
+- Two unit types create strategic tension: armies hold territory, fleets project power
 
 ---
 
 ## Factions
 
-| Faction | Starting Units | Home Systems | Victory Threshold |
-|---------|----------------|--------------|-------------------|
-| **United Federation of Planets** | 5 fleets | Earth, Vulcan, Andoria, Tellar Prime, Rigel | 10 supply centers |
-| **Klingon Empire** | 5 fleets | Qo'noS, Ty'Gokor, Narendra III, Boreth, Khitomer | 12 supply centers |
-| **Romulan Star Empire** | 4 fleets | Romulus, Remus, Rator III, Abraxas | 8 supply centers |
-| **Cardassian Union** | 5 fleets | Cardassia Prime, Chin'toka, Septimus III, Kelvas V, Rakal | 14 supply centers |
-| **Ferengi Alliance** | 3 fleets | Ferenginar, Volchok Prime, Clarus | 9 supply centers OR 100 latinum |
-| **Breen Confederacy** | 6 fleets | Breen, Portas V, Dozaria, Breen Core, Breen Citadel, Breen Fortress | 18 supply centers |
-| **Gorn Hegemony** | 5 fleets | Gornar, S'sgaron, Seudath, Gorn Fortress, Gorn Colony | 9 supply centers |
+| Faction | Starting Armies | Starting Fleets | Home Systems | Victory Threshold |
+|---------|----------------|-----------------|--------------|-------------------|
+| **United Federation of Planets** | 3 (Earth, Vulcan, Andoria) | 2 (Earth, Vulcan) | 5 | 10 SC |
+| **Klingon Empire** | 2 (Qo'noS, Ty'Gokor) | 3 (Qo'noS, Narendra, Boreth) | 5 | 10 SC |
+| **Romulan Star Empire** | 2 (Romulus, Remus) | 2 (Romulus, Rator) | 4 | 8 SC |
+| **Cardassian Union** | 3 (Cardassia, Chin'toka, Septimus) | 2 (Cardassia, Kelvas) | 5 | 10 SC |
+| **Ferengi Alliance** | 2 (Ferenginar, Volchok) | 1 (Ferenginar) | 3 | 8 SC or 100 latinum |
+| **Breen Confederacy** | 2 (Breen, Portas) | 2 (Breen, Dozaria) | 4 | 10 SC |
+| **Gorn Hegemony** | 3 (Gornar, S'sgaron, Seudath) | 2 (Gornar, Gorn Fortress) | 5 | 9 SC |
 
 ---
 
 ## The Map
 
-The map consists of three layers connected by hyperlanes:
+The map consists of three layers connected by vertical lanes:
 
 ### Layer 2: Core Sector (Primary)
-- Contains all **47 supply centers** (marked with a star icon)
+- Contains all **47 supply centers**
 - 33 home systems belonging to the 7 factions
 - 14 neutral supply centers available for capture
 
 ### Layer 1 & 3: Hyperspace Bypass Routes
-- 20 hyperspace territories (no supply centers)
-- Allow rapid movement between distant regions
+- 18 hyperspace territories (no supply centers)
+- Allow rapid fleet movement between distant regions
 - Strategic for flanking maneuvers
 
-### Movement
-- Units may move to any **adjacent** territory via hyperlane
-- Hyperlanes connect systems within the same layer
-- **Vertical lanes** connect systems between layers
-- All units are fleets (space vessels) - there are no armies
+### Connections
+- **Hyperlanes** connect systems within the same layer
+- **Vertical lanes** connect systems between layers (Core to Upper/Lower Hyperspace)
+- Each connection is a traversable edge that fleets can occupy
+
+---
+
+## Units
+
+There are two unit types in v2:
+
+### Armies
+- Occupy **planets** (system nodes)
+- Move planet-to-planet along hyperlanes
+- **Capture supply centers** at the end of Fall turns
+- One army per planet
+
+### Fleets
+- Occupy **orbits** or **hyperlanes**
+- Move from orbit to hyperlane, hyperlane to hyperlane, or hyperlane to orbit
+- **Cannot capture supply centers** (only armies can)
+- Project power and control space routes
+- One fleet per orbit; up to two **allied** fleets per hyperlane
+
+### Strategic Tension
+You need armies to hold territory and fleets to protect them. An army without a friendly fleet in orbit is vulnerable (-1 defense).
+
+---
+
+## Positions
+
+Units occupy one of three position types:
+
+### Planet Positions
+- Named by system ID: `earth`, `vulcan`, `qonos`
+- Occupied by armies (one per planet)
+
+### Orbit Positions
+- Planet ID with `:orbit` suffix: `earth:orbit`, `vulcan:orbit`
+- Occupied by fleets (one per orbit)
+- Adjacent to hyperlanes connected to that planet
+
+### Hyperlane (Edge) Positions
+- Two endpoint IDs sorted alphabetically, joined by tilde: `earth~vulcan`
+- Occupied by fleets (up to two allied fleets)
+- Adjacent to other hyperlanes sharing an endpoint, and to the orbits of both endpoint planets
 
 ---
 
@@ -76,82 +120,111 @@ The map consists of three layers connected by hyperlanes:
 Each game year consists of two turns: **Spring** and **Fall**.
 
 ### Spring Turn
-1. **Diplomacy Phase** - Negotiate with other players (no time limit)
-2. **Order Phase** - All players simultaneously submit orders
-3. **Resolution Phase** - Orders are resolved; units move or bounce
-4. **Retreat Phase** - Dislodged units retreat or disband
+1. **Order Phase** - All players simultaneously submit orders
+2. **Resolution Phase** - Orders resolve; units move or bounce
+3. **Retreat Phase** - Dislodged units retreat or disband
 
 ### Fall Turn
-1. **Diplomacy Phase**
-2. **Order Phase**
-3. **Resolution Phase**
-4. **Retreat Phase**
-5. **Build Phase** - Adjust unit counts to match supply centers
+1. **Order Phase**
+2. **Resolution Phase**
+3. **Retreat Phase**
+4. **Build Phase** - Ownership updates; adjust unit counts to match supply centers
 
-After the Fall Build Phase, the year advances (2370 → 2371 → ...).
+After the Fall Build Phase, the year advances (2370, 2371, ...).
 
 ---
 
 ## Orders
 
-Each unit must receive exactly one order per turn. If no order is submitted, the unit **holds** by default.
+Each unit must receive exactly one order per turn. Units without orders **hold** by default.
 
 ### Hold
 ```
-Fleet Earth HOLD
+Army Earth HOLD
+Fleet Earth:orbit HOLD
 ```
 The unit stays in place and defends with strength 1.
 
 ### Move
 ```
-Fleet Earth MOVE to Vulcan
+Army Earth MOVE to Vulcan
+Fleet Earth:orbit MOVE to earth~vulcan
+Fleet earth~vulcan MOVE to vulcan:orbit
 ```
-The unit attempts to move to an adjacent territory. Attack strength is 1.
+The unit attempts to move to an adjacent position. Attack strength is 1.
+
+**Movement rules by unit type:**
+
+| Unit | From | Can Move To |
+|------|------|-------------|
+| Army | Planet | Adjacent planet |
+| Fleet | Orbit | Hyperlane connected to that planet |
+| Fleet | Hyperlane | Adjacent hyperlane, or orbit of either endpoint |
 
 ### Support
 ```
-Fleet Vulcan SUPPORT Fleet Earth MOVE to Andoria
-Fleet Vulcan SUPPORT Fleet Andoria HOLD
+Army Vulcan SUPPORT Army Earth MOVE to Andoria
+Fleet earth:orbit SUPPORT Army Earth HOLD
+Fleet earth~vulcan SUPPORT Fleet vulcan:orbit HOLD
 ```
 The unit adds +1 strength to another unit's move or hold. The supporting unit does not move.
 
-**Support Rules:**
+**Support adjacency rules:**
+
+| Supporter | Can Support |
+|-----------|-------------|
+| Army on planet | Army moving to/holding adjacent planet |
+| Fleet in orbit | Army on same planet; fleet on adjacent hyperlane |
+| Fleet on hyperlane | Army on either endpoint planet; fleet on adjacent hyperlane or either endpoint orbit |
+
+**Support rules:**
 - You can support any unit, including enemies
 - Support can only be given to adjacent destinations
-- Support is **cut** if the supporting unit is attacked (from any direction except the territory being supported into)
-- Support is **not cut** if attacked from the destination of the supported move
+- Support is **cut** if the supporting unit is attacked (from any direction except the position being supported into)
 
 ### Convoy
 ```
-Fleet Hyperspace Alpha CONVOY Fleet Earth to Romulus
+Fleet earth~vulcan CONVOY Army from Earth to Andoria
 ```
-Convoys allow units to move through non-adjacent territories via hyperspace chains. Multiple fleets can form a convoy chain.
+Fleets on hyperlanes can convoy armies across non-adjacent planets. Multiple fleets form a convoy chain.
+
+**Convoy rules:**
+- Only fleets on hyperlanes can convoy
+- The army orders MOVE with a convoy route
+- Each fleet in the chain orders CONVOY specifying the army's origin and destination
+- If the convoy chain is unbroken, the army moves to the destination
+- If any convoying fleet is dislodged, the convoy fails
 
 ---
 
 ## Order Resolution
 
-All orders resolve simultaneously using these principles:
+All orders resolve simultaneously:
 
 ### Combat Strength
 - Base strength: **1**
 - Each valid support: **+1**
 - Klingon attacking: **+1** (faction ability)
 - Klingon defending: **-1** (faction ability)
+- Army without friendly fleet in orbit: **-1 defense**
+
+### Fleet-in-Orbit Defense Bonus
+An army on a planet defends at -1 if there is no friendly fleet in the same planet's orbit. This makes fleet support critical for holding territory.
 
 ### Resolution Rules
 
-1. **Stronger force wins** - The unit with higher strength moves/holds successfully
-2. **Ties result in standoff** - Neither unit moves; both stay in place
-3. **Dislodgement** - A unit is dislodged if an attacker's strength exceeds its defense
-4. **Self-dislodgement prohibited** - You cannot dislodge your own unit
-5. **Head-to-head battles** - When two units try to swap positions, the stronger one succeeds (ties = both stay)
-6. **Beleaguered garrison** - A unit attacked from multiple directions with equal strength from each is not dislodged
+1. **Stronger force wins** - Higher strength moves/holds successfully
+2. **Ties = standoff** - Neither unit moves; both stay in place
+3. **Dislodgement** - A unit is dislodged when attacker strength exceeds defense
+4. **Self-dislodgement prohibited** - You cannot dislodge your own units
+5. **Armies fight armies** - For planet control
+6. **Fleets fight fleets** - For space control (orbits and hyperlanes)
+7. **Head-to-head** - When two units try to swap, stronger wins (tie = both stay)
 
-### Support Cutting
-Support is **cut** when the supporting unit is attacked, EXCEPT:
-- The attack comes from the territory the support is directed toward
-- The attacking unit belongs to the same faction as the supporter
+### Hyperlane Capacity
+- A hyperlane can hold **2 fleets maximum**
+- Both fleets must be **allied** (same faction or formal alliance)
+- If two enemy fleets end up on the same hyperlane, they fight (stronger stays, loser retreats)
 
 ---
 
@@ -160,64 +233,69 @@ Support is **cut** when the supporting unit is attacked, EXCEPT:
 When a unit is dislodged, it must retreat during the Retreat Phase.
 
 ### Valid Retreat Destinations
-- Must be adjacent to the unit's current location
+- Must be adjacent to the unit's current position
 - Must be unoccupied
-- Must not be the territory the attacker came from
-- Must not be a territory where a standoff occurred this turn
+- Must not be the position the attacker came from
+- Must not be a position where a standoff occurred this turn
+- Must be a valid position type for that unit (armies to planets, fleets to orbits/edges)
 
 ### Retreat Options
-1. **Retreat** - Move to a valid adjacent territory
+1. **Retreat** - Move to a valid adjacent position
 2. **Disband** - Remove the unit from the game
 
 If no valid retreat exists, the unit is automatically disbanded.
-
-**Multiple retreats to same territory:** If two or more dislodged units attempt to retreat to the same location, all are disbanded.
 
 ---
 
 ## Builds and Disbands
 
-After the Fall Retreat Phase, each faction adjusts their unit count.
+After the Fall Retreat Phase, supply center ownership updates and each faction adjusts their unit count.
+
+### Ownership
+- A planet's supply center is controlled by the faction whose **army** occupies it at the end of Fall
+- Fleets in orbit do **not** capture supply centers
+- Ownership persists until another army takes the planet
 
 ### Counting
-- Count your **supply centers** (systems you control)
-- Count your **units** currently on the map
+- Count your **supply centers** (planets you control)
+- Count your **units** (armies + fleets) on the map
 
 ### Adjustments
 - **More SCs than units:** Build new units (up to the difference)
-- **More units than SCs:** Disband units (mandatory, your choice which)
+- **More units than SCs:** Disband units (your choice which)
 - **Equal:** No adjustment needed
 
 ### Build Rules
-- New units may only be built on **unoccupied home systems**
-- You cannot build on occupied home systems, even if you own them
-- You cannot build more units than you have unoccupied home systems
+- **Armies** are built on unoccupied home planet supply centers
+- **Fleets** are built in orbit of home planet supply centers (orbit must be empty)
+- You can build **both** an army and a fleet at the same home planet if both the planet and orbit are empty
+- You can only build on home planets you still control
 
 ### Disbands
-- If you cannot build but must disband, you choose which units to remove
-- If you fail to submit disband orders, units are disbanded automatically (furthest from home systems first)
+- You choose which units to remove
+- If you fail to submit disband orders, units are disbanded automatically
 
 ---
 
 ## Victory Conditions
 
-Victory is achieved at the end of any Fall Build Phase. Each faction has an **asymmetric victory threshold**:
+Victory is checked at the end of each Fall Build Phase.
 
-| Faction | Solo Victory Condition |
-|---------|----------------------|
-| Federation | Control **10** supply centers |
-| Klingon | Control **12** supply centers |
-| Romulan | Control **8** supply centers |
-| Cardassian | Control **14** supply centers |
-| Ferengi | Control **9** supply centers OR accumulate **100 latinum** |
-| Breen | Control **18** supply centers |
-| Gorn | Control **9** supply centers |
+| Faction | Solo Victory |
+|---------|-------------|
+| Federation | 10 supply centers |
+| Klingon | 10 supply centers |
+| Romulan | 8 supply centers |
+| Cardassian | 10 supply centers |
+| Ferengi | 8 supply centers OR 100 latinum |
+| Breen | 10 supply centers |
+| Gorn | 9 supply centers |
 
 ### Alliance Victory
-Two players may form an official alliance. Allied factions win together if their **combined** supply centers reach **24** (half of total). Both players share the victory.
+Two allied factions win together if their **combined** supply centers reach **24** (half of total). Both players share the victory.
 
 ### Elimination
-A faction is eliminated when they control **0 supply centers** at the end of a Fall Build Phase. Eliminated players may continue to observe but cannot issue orders or negotiate.
+A faction is eliminated when they control **0 supply centers** and have **0 units** at the end of a Fall Build Phase.
 
 ---
 
@@ -226,31 +304,27 @@ A faction is eliminated when they control **0 supply centers** at the end of a F
 Players may form one official alliance at a time.
 
 ### Proposing an Alliance
-- Any player may propose an alliance to any other player during the Diplomacy Phase
+- Any player may propose an alliance to any other player
 - The recipient may accept or reject
-- Accepting creates a formal alliance
+- Accepting creates a formal alliance visible to all
 
 ### Alliance Benefits
-- Combined supply center count toward the 24-SC alliance victory
-- Alliance status is visible to all players
+- Combined supply center count toward 24-SC alliance victory
+- Two allied fleets may share a single hyperlane
 
 ### Breaking an Alliance
 - Either ally may break the alliance at any time
-- Breaking an alliance has no penalty, but earns distrust
+- No mechanical penalty, but earns distrust
 
-### Alliance Restrictions
+### Restrictions
 - Maximum one alliance per player
 - Cannot ally with eliminated factions
-- Cannot propose to a faction you already have a pending proposal with
 
 ---
 
 ## Faction Abilities
 
-Each faction has a unique ability reflecting their Star Trek identity. Abilities fall into two categories:
-
-- **Passive** - Always active, no action required
-- **Active** - Must be activated, often limited uses
+Each faction has a unique ability. Abilities are either **passive** (always active) or **active** (limited uses).
 
 ---
 
@@ -260,39 +334,26 @@ Each faction has a unique ability reflecting their Star Trek identity. Abilities
 
 **Effect:** Prevent one of your units from being dislodged.
 
-**Timing:**
-1. Resolution Phase completes - your unit would be dislodged
-2. During Retreat Phase, before retreating, you may activate this ability
-3. The protected unit remains in place as if not dislodged
-4. The attacker does not advance into the territory
+**Timing:** During Retreat Phase, before submitting retreats, activate to keep a dislodged unit in place. The attacker does not advance.
 
-**Restrictions:**
-- Once per game (entire game, not per turn)
-- Must be used during the Retreat Phase before submitting retreat orders
-- Cannot be used if the unit has already retreated or disbanded
+**Restrictions:** Once per entire game. Cannot be used after the unit has already retreated.
 
 ---
 
 ### Klingon: Warrior's Rage
 
-**Type:** Passive (always active)
+**Type:** Passive
 
-**Effect:** +1 attack strength, -1 defense strength.
+**Effect:** +1 attack strength on all MOVE orders. -1 defense on HOLD.
 
-**Timing:**
-- Applied automatically during Order Resolution
-- Attack bonus applies to all MOVE orders
-- Defense penalty applies when holding or being attacked
+| Situation | Strength |
+|-----------|----------|
+| Attacking (MOVE) | 1 + 1 = **2** |
+| Defending (HOLD) | 1 - 1 = **0** |
+| Attacking with 1 support | 2 + 1 = **3** |
+| Defending with 1 support | 0 + 1 = **1** |
 
-**Details:**
-| Situation | Klingon Strength |
-|-----------|------------------|
-| Attacking (MOVE) | Base 1 + 1 bonus = **2** |
-| Defending (HOLD) | Base 1 - 1 penalty = **0** |
-| With 1 support attacking | 2 + 1 support = **3** |
-| With 1 support defending | 0 + 1 support = **1** |
-
-**Strategic Note:** Klingon units are powerful attackers but vulnerable when stationary. Keep them moving or well-supported.
+Keep Klingon units moving or well-supported.
 
 ---
 
@@ -300,38 +361,15 @@ Each faction has a unique ability reflecting their Star Trek identity. Abilities
 
 **Type:** Passive (each turn)
 
-**Effect:** Before orders resolve, reveal 1-2 random enemy orders.
-
-**Timing:**
-1. All players submit orders
-2. Before Resolution Phase begins, 1-2 enemy orders are randomly selected
-3. These orders are revealed to the Romulan player only
-4. Resolution proceeds normally
-
-**Details:**
-- Reveals complete order (unit, order type, destination)
-- Selected randomly from all non-Romulan orders
-- Resets each turn (new orders revealed next turn)
-- Cannot choose which orders to reveal
+**Effect:** Before resolution, 1-2 random enemy orders are revealed to the Romulan player only. Resets each turn.
 
 ---
 
 ### Cardassian: Obsidian Order
 
-**Type:** Passive (always active)
+**Type:** Passive
 
-**Effect:** See the destination of all enemy MOVE orders (but not supports or holds).
-
-**Timing:**
-1. All players submit orders
-2. Before Resolution Phase, Cardassian sees all enemy move destinations
-3. Does NOT reveal: which unit is moving there, or support/hold orders
-
-**Details:**
-- Only shows destination systems, not origins
-- Does not reveal convoy orders
-- Does not reveal hold or support orders
-- Information is per-faction (you know Klingon units are moving to Organia, but not which ones)
+**Effect:** See the destination of all enemy MOVE orders (but not supports, holds, or which unit is moving). Information available after all orders submitted, before resolution.
 
 ---
 
@@ -339,29 +377,11 @@ Each faction has a unique ability reflecting their Star Trek identity. Abilities
 
 **Type:** Passive economy + Active abilities
 
-**Effect:**
 - Earn **0.5 latinum per supply center** each Fall Build Phase
-- Spend **15 latinum** to claim a neutral supply center (Bribe)
-- Spend **25 latinum** to cancel one enemy support order (Sabotage)
+- **Bribe** (15 latinum): Claim a neutral supply center without a unit there
+- **Sabotage** (25 latinum): Cancel one enemy support order before resolution
 
-**Timing - Income:**
-1. Fall Build Phase begins
-2. Count Ferengi supply centers
-3. Add 0.5 latinum per SC to Ferengi treasury (rounded down)
-
-**Timing - Bribe:**
-1. During Order Phase, select a neutral (unowned) supply center
-2. Pay 15 latinum
-3. During Build Phase, that SC is automatically claimed by Ferengi
-4. No unit required in that territory
-
-**Timing - Sabotage:**
-1. During Order Phase, select one enemy support order to sabotage
-2. Pay 25 latinum
-3. That support order is canceled before resolution
-4. The supporting unit still cannot move (treated as failed support)
-
-**Victory:** Ferengi can win by accumulating **100 latinum** instead of 9 SCs.
+**Victory:** Ferengi can win by accumulating **100 latinum** instead of reaching the SC threshold.
 
 ---
 
@@ -369,57 +389,27 @@ Each faction has a unique ability reflecting their Star Trek identity. Abilities
 
 **Type:** Active (once per game)
 
-**Effect:** Freeze a territory - no units can move in or out for one turn.
-
-**Timing:**
-1. During Order Phase, designate a territory to freeze
-2. The freeze takes effect for the current turn only
-3. During Resolution:
-   - Units in frozen territory cannot leave (MOVE orders fail)
-   - Units cannot enter frozen territory (MOVE orders fail)
-   - HOLD and SUPPORT orders in/to frozen territory still work
-4. Freeze expires at end of turn
-
-**Restrictions:**
-- Once per game
-- Can freeze any territory (including your own)
-- Units in frozen territory are not dislodged (attackers bounce)
-- Support can still be given from frozen territory
+**Effect:** Freeze a territory for one turn. No units can move in or out. HOLD and SUPPORT still work. Units in frozen territory cannot be dislodged.
 
 ---
 
 ### Gorn: Reptilian Resilience
 
-**Type:** Passive (automatic)
+**Type:** Passive
 
-**Effect:** 50% chance to survive dislodgement and return to nearest home system.
-
-**Timing:**
-1. Gorn unit is dislodged and has no valid retreat options
-2. Normally this unit would be disbanded
-3. A 50% survival check is made
-4. If successful: unit teleports to nearest unoccupied Gorn home system
-5. If failed: unit is disbanded normally
-
-**Details:**
-- Only triggers when unit would be disbanded (no retreat options)
-- Does NOT trigger if retreat is available
-- "Nearest" = first available unoccupied home system
-- If all home systems occupied, unit is disbanded regardless of roll
-- Each unit gets its own independent roll
+**Effect:** When a Gorn unit is dislodged with no valid retreat, 50% chance to survive and teleport to the nearest unoccupied Gorn home system. If all home systems are occupied, the unit is disbanded.
 
 ---
 
 ## Latinum Economy
 
-Latinum is the currency of the Ferengi Alliance.
+Latinum is exclusive to the Ferengi Alliance.
 
-### Earning Latinum
-- **Ferengi only** - Other factions do not earn or use latinum
+### Earning
 - **0.5 latinum per supply center** per Fall Build Phase
 - Accumulates across turns
 
-### Spending Latinum
+### Spending
 
 | Action | Cost | Effect |
 |--------|------|--------|
@@ -427,47 +417,29 @@ Latinum is the currency of the Ferengi Alliance.
 | Sabotage | 25 | Cancel one enemy support order |
 
 ### Economic Victory
-If Ferengi accumulates **100 latinum** at any point, they immediately win the game (checked during Build Phase).
+Ferengi wins immediately upon reaching **100 latinum** (checked during Build Phase).
 
 ---
 
 ## Quick Reference
 
 ### Turn Order
-1. Diplomacy → 2. Orders → 3. Resolution → 4. Retreats → (Fall only: 5. Builds)
+1. Orders -> 2. Resolution -> 3. Retreats -> (Fall only: 4. Builds)
 
 ### Combat Math
-- Attacker strength = 1 + supports (+1 if Klingon)
-- Defender strength = 1 + supports (-1 if Klingon)
-- Higher strength wins; ties = standoff
+- Attacker: 1 + supports (+1 if Klingon)
+- Defender: 1 + supports (-1 if Klingon, -1 if army without fleet in orbit)
+- Higher wins; tie = standoff
 
-### Ability Timing Summary
+### Movement Summary
+- Armies: planet to adjacent planet
+- Fleets in orbit: orbit to connected hyperlane
+- Fleets on hyperlane: to adjacent hyperlane or endpoint orbit
 
-| Ability | When It Applies |
-|---------|-----------------|
-| Federation: Diplomatic Immunity | Retreat Phase (before retreating) |
-| Klingon: Warrior's Rage | Resolution Phase (automatic) |
-| Romulan: Tal Shiar Intelligence | After orders submitted, before resolution |
-| Cardassian: Obsidian Order | After orders submitted, before resolution |
-| Ferengi: Bribe | Order Phase (takes effect in Build Phase) |
-| Ferengi: Sabotage | Order Phase (takes effect in Resolution) |
-| Breen: Energy Dampening | Order Phase (lasts until end of turn) |
-| Gorn: Reptilian Resilience | Retreat Phase (when no retreat available) |
-
----
-
-## Designer's Notes
-
-Star Trek Diplomacy adapts classic Diplomacy for the Star Trek universe while maintaining strategic depth:
-
-- **Asymmetric victory conditions** create natural alliances and rivalries
-- **Faction abilities** encourage thematic play styles
-- **3-layer map** adds vertical maneuver options
-- **Latinum economy** gives Ferengi an alternate path to victory
-
-The key to success remains the same: diplomacy. Make deals, break them at the right moment, and always have a backup plan.
-
-*Live long and prosper. Or don't - this is Diplomacy.*
+### Position Notation
+- Planet: `earth`
+- Orbit: `earth:orbit`
+- Hyperlane: `earth~vulcan` (alphabetical order)
 
 ---
 

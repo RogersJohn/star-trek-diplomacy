@@ -51,9 +51,6 @@ class GameManager {
     // Turn history
     this.history = [];
 
-    // Messages
-    this.messages = [];
-
     // Turn timer state
     this.turnDeadline = null;           // ISO timestamp when orders due
     this.delinquentPlayers = [];        // Factions who missed deadline
@@ -753,7 +750,6 @@ class GameManager {
       alliances: this.alliances.toJSON(),
       phase: this.phase,
       history: this.history,
-      messages: this.messages,
       winner: this.winner,
       turn: this.state.turn,
       year: this.state.year,
@@ -803,7 +799,6 @@ class GameManager {
     // Restore other state
     game.phase = data.phase;
     game.history = data.history;
-    game.messages = data.messages || [];
     game.winner = data.winner;
 
     // Restore turn timer state
