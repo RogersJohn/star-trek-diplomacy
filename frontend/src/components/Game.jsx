@@ -9,6 +9,8 @@ import StatusBar from './StatusBar';
 import FactionAbilityPanel from './FactionAbilityPanel';
 import AlliancePanel from './AlliancePanel';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function Game() {
   const { gameId } = useParams();
   const { getToken } = useAuth();
@@ -62,7 +64,7 @@ export default function Game() {
     };
 
     try {
-      const response = await fetch(`/api/game/${gameId}/alliance/break`, {
+      const response = await fetch(`${API_URL}/api/game/${gameId}/alliance/break`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ faction }),
@@ -91,7 +93,7 @@ export default function Game() {
     };
 
     try {
-      const response = await fetch(`/api/game/${gameId}/vote-kick`, {
+      const response = await fetch(`${API_URL}/api/game/${gameId}/vote-kick`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -121,7 +123,7 @@ export default function Game() {
     };
 
     try {
-      const response = await fetch(`/api/game/${gameId}/check-deadline`, {
+      const response = await fetch(`${API_URL}/api/game/${gameId}/check-deadline`, {
         method: 'POST',
         headers,
       });

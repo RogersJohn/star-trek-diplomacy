@@ -4,6 +4,7 @@ import { useUser, useAuth } from '@clerk/clerk-react'
 import { useGameStore } from '../hooks/useGameStore'
 
 const IS_DEV = import.meta.env.DEV
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 const FACTIONS = [
   { id: 'federation', name: 'United Federation of Planets', color: 'federation' },
@@ -45,7 +46,7 @@ export default function Home() {
 
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch('/api/lobby/create', {
+      const res = await fetch(`${API_URL}/api/lobby/create`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -77,7 +78,7 @@ export default function Home() {
 
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`/api/lobby/${joinCode}/join`, {
+      const res = await fetch(`${API_URL}/api/lobby/${joinCode}/join`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -205,7 +206,7 @@ export default function Home() {
                 setDevLoading(true)
                 setDevStatus('')
                 try {
-                  const res = await fetch('/api/test/create-game', { method: 'POST' })
+                  const res = await fetch(`${API_URL}/api/test/create-game`, { method: 'POST' })
                   const data = await res.json()
                   if (data.success) {
                     setDevGameId(data.gameId)
@@ -248,7 +249,7 @@ export default function Home() {
                     setDevStatus('')
                     try {
                       const token = await getToken()
-                      const res = await fetch(`/api/test/game/${devGameId}/join`, {
+                      const res = await fetch(`${API_URL}/api/test/game/${devGameId}/join`, {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useUser, useAuth } from '@clerk/clerk-react'
 import { useGameStore, setAuthTokenGetter } from '../hooks/useGameStore'
 
+const API_URL = import.meta.env.VITE_API_URL || ''
+
 const FACTIONS = [
   { id: 'federation', name: 'Federation', color: '#3399ff', ability: 'Diplomatic Immunity' },
   { id: 'klingon', name: 'Klingon', color: '#cc0000', ability: "Warrior's Rage" },
@@ -75,7 +77,7 @@ export default function Lobby() {
   
   const fetchLobby = async () => {
     try {
-      const res = await fetch(`/api/lobby/${lobbyId}`)
+      const res = await fetch(`${API_URL}/api/lobby/${lobbyId}`)
       const data = await res.json()
 
       if (data.error) {
@@ -103,7 +105,7 @@ export default function Lobby() {
   const handleSelectFaction = async (factionId) => {
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`/api/lobby/${lobbyId}/select-faction`, {
+      const res = await fetch(`${API_URL}/api/lobby/${lobbyId}/select-faction`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ faction: factionId })
@@ -123,7 +125,7 @@ export default function Lobby() {
   const handleToggleReady = async () => {
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`/api/lobby/${lobbyId}/ready`, {
+      const res = await fetch(`${API_URL}/api/lobby/${lobbyId}/ready`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ ready: !isReady })
@@ -141,7 +143,7 @@ export default function Lobby() {
   const handleStartGame = async () => {
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`/api/lobby/${lobbyId}/start`, {
+      const res = await fetch(`${API_URL}/api/lobby/${lobbyId}/start`, {
         method: 'POST',
         headers,
       })
@@ -158,7 +160,7 @@ export default function Lobby() {
   const handleUpdateSettings = async (newSettings) => {
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`/api/lobby/${lobbyId}/settings`, {
+      const res = await fetch(`${API_URL}/api/lobby/${lobbyId}/settings`, {
         method: 'POST',
         headers,
         body: JSON.stringify(newSettings)
