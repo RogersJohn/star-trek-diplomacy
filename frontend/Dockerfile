@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -15,26 +15,20 @@ COPY package*.json ./
 COPY frontend/package*.json ./frontend/
 COPY shared/package*.json ./shared/
 
-# Install dependencies using workspace
+# Install all dependencies (need devDeps for vite build)
 RUN npm ci --workspace=frontend --workspace=shared
 
 # Copy source code
 COPY frontend/ ./frontend/
 COPY shared/ ./shared/
 
+# Build the frontend
 WORKDIR /app/frontend
-
 RUN npm run build
 
-FROM nginx:alpine
+# Remove node_modules to reduce image size, keep only what server.js needs
+RUN rm -rf node_modules ../node_modules ../shared
 
-COPY --from=builder /app/frontend/dist /usr/share/nginx/html
-COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
+EXPOSE 3000
 
-# Only substitute BACKEND_URL, leave nginx variables untouched
-ENV NGINX_ENVSUBST_FILTER=BACKEND_URL
-ENV BACKEND_URL=http://localhost:3000
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]
