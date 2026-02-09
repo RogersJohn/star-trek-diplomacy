@@ -64,11 +64,11 @@ describe('Basic Movement', () => {
     expect(results.some(r => r.type === 'move_success' && r.to === 'vulcan')).toBe(true);
   });
 
-  test('2. Army cannot move to non-adjacent planet', () => {
+  test('2. Non-adjacent army move is valid but requires convoy', () => {
     const state = freshState();
     state.units['earth'] = { faction: 'federation', type: 'army' };
 
-    // qonos is not adjacent to earth
+    // qonos is not adjacent to earth — valid but flagged as requiring convoy
     const validator = new OrderValidator(state);
     const result = validator.validateOrder({
       type: 'move',
@@ -77,8 +77,8 @@ describe('Basic Movement', () => {
       faction: 'federation',
     });
 
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe('Destination not adjacent');
+    expect(result.valid).toBe(true);
+    expect(result.requiresConvoy).toBe(true);
   });
 
   test('3. Army cannot move to edge position', () => {
@@ -1333,5 +1333,60 @@ describe('Data Integrity', () => {
         expect(SYSTEMS[planet].supply).toBe(true);
       });
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Order Validation v2.1 (Phase 4)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Order Validation v2.1', () => {
+  test('Non-adjacent army move is flagged as requiring convoy', () => {
+    const state = freshState();
+    state.units['earth'] = { faction: 'federation', type: 'army' };
+
+    const validator = new OrderValidator(state);
+    // earth -> romulus is not adjacent, but both are planets
+    const result = validator.validateOrder({
+      type: 'move', location: 'earth', destination: 'romulus', faction: 'federation',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.requiresConvoy).toBe(true);
+  });
+
+  test('Non-adjacent fleet move is rejected', () => {
+    const state = freshState();
+    const edgeId = createEdgeId('earth', 'vulcan');
+    state.units[edgeId] = [{ faction: 'federation', type: 'fleet' }];
+
+    const validator = new OrderValidator(state);
+    const result = validator.validateOrder({
+      type: 'move', location: edgeId, destination: 'romulus:orbit', faction: 'federation',
+    });
+    expect(result.valid).toBe(false);
+  });
+
+  test('Adjacent army move does not flag requiresConvoy', () => {
+    const state = freshState();
+    state.units['earth'] = { faction: 'federation', type: 'army' };
+
+    const validator = new OrderValidator(state);
+    const result = validator.validateOrder({
+      type: 'move', location: 'earth', destination: 'vulcan', faction: 'federation',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.requiresConvoy).toBeUndefined();
+  });
+
+  test('Army cannot move to orbit position', () => {
+    const state = freshState();
+    state.units['earth'] = { faction: 'federation', type: 'army' };
+
+    const validator = new OrderValidator(state);
+    const result = validator.validateOrder({
+      type: 'move', location: 'earth', destination: 'vulcan:orbit', faction: 'federation',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain('cannot occupy');
   });
 });

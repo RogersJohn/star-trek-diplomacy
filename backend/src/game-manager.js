@@ -198,6 +198,25 @@ class GameManager {
       return { success: false, reason: 'Invalid faction' };
     }
 
+    // Check for duplicate orders to the same unit
+    const locations = orders.map(o => o.location);
+    const duplicates = locations.filter((loc, i) => locations.indexOf(loc) !== i);
+    if (duplicates.length > 0) {
+      return {
+        success: false,
+        reason: `Duplicate orders for locations: ${[...new Set(duplicates)].join(', ')}`,
+      };
+    }
+
+    // Check order count doesn't exceed unit count
+    const unitCount = this.state.getUnits(faction).length;
+    if (orders.length > unitCount) {
+      return {
+        success: false,
+        reason: `Too many orders (${orders.length}) for units (${unitCount})`,
+      };
+    }
+
     // Validate each order
     const validator = new OrderValidator(this.state);
     // Pass frozen territories to validator (Phase 2 - Breen)
@@ -208,7 +227,11 @@ class GameManager {
     orders.forEach((order, index) => {
       const result = validator.validateOrder({ ...order, faction });
       if (result.valid) {
-        validatedOrders.push({ ...order, faction });
+        const validatedOrder = { ...order, faction };
+        if (result.requiresConvoy) {
+          validatedOrder.viaConvoy = true;
+        }
+        validatedOrders.push(validatedOrder);
       } else {
         errors.push({ index, order, reason: result.reason });
       }

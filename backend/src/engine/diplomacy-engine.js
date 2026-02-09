@@ -467,13 +467,17 @@ class OrderValidator {
       return { valid: false, reason: 'No destination specified' };
     }
 
-    if (!isAdjacent(from, to, unit.type)) {
-      return { valid: false, reason: 'Destination not adjacent' };
-    }
-
     const destType = getPositionType(to);
     if (!canUnitOccupy(unit.type, destType)) {
       return { valid: false, reason: `${unit.type} cannot occupy ${destType}` };
+    }
+
+    if (!isAdjacent(from, to, unit.type)) {
+      // Non-adjacent moves are only valid for armies via convoy
+      if (unit.type === UNIT_TYPES.ARMY && isPlanetPosition(from) && isPlanetPosition(to)) {
+        return { valid: true, requiresConvoy: true };
+      }
+      return { valid: false, reason: 'Destination not adjacent' };
     }
 
     return { valid: true };
