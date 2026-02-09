@@ -1,0 +1,15 @@
+{
+  "name": "star-trek-diplomacy-simulations",
+  "version": "1.0.0",
+  "description": "Monte Carlo balance simulation for Star Trek Diplomacy",
+  "scripts": {
+    "sim:quick": "node simulate.js --games=100 --strategy=random",
+    "sim:full": "node simulate.js --games=1000 --strategy=balanced",
+    "sim:aggressive": "node simulate.js --games=500 --strategy=aggressive",
+    "sim:all": "node simulate.js --games=500 --strategy=all --report",
+    "analyze": "node analysis.js"
+  },
+  "dependencies": {
+    "@star-trek-diplomacy/shared": "*"
+  }
+}
