@@ -76,20 +76,19 @@ class LatinumEconomy {
     }
     
     processIncome(gameState) {
-        Object.keys(this.balances).forEach(faction => {
-            const scs = gameState.countSupplyCenters(faction);
-            const ability = FACTION_ABILITIES[faction];
-            const rate = ability?.incomePerSC || 0.33;
-            const income = Math.floor(scs * rate);
-            
-            this.balances[faction] += income;
-            this.transactions.push({
-                turn: gameState.turn,
-                faction,
-                type: 'income',
-                amount: income,
-                balance: this.balances[faction]
-            });
+        // Latinum income is Ferengi-exclusive per rules
+        const ferengiRate = FACTION_ABILITIES.ferengi.incomePerSC;
+        const ferengiSCs = gameState.countSupplyCenters('ferengi');
+        const income = ferengiSCs * ferengiRate;
+
+        if (!this.balances['ferengi']) this.balances['ferengi'] = 0;
+        this.balances['ferengi'] += income;
+        this.transactions.push({
+            turn: gameState.turn,
+            faction: 'ferengi',
+            type: 'income',
+            amount: income,
+            balance: this.balances['ferengi']
         });
     }
     

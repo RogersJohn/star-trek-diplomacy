@@ -57,13 +57,13 @@ const SYSTEMS = {
     volchok: { name: "Volchok Prime", layer: 2, faction: 'ferengi', supply: true, home: true, x: 15, y: 50, z: 75 },
     clarus: { name: "Clarus", layer: 2, faction: 'ferengi', supply: true, home: true, x: 25, y: 50, z: 80 },
     
-    // -- Breen (6 home - Turkey position) --
+    // -- Breen (4 home, 2 non-home faction SCs) --
     breen: { name: "Breen", layer: 2, faction: 'breen', supply: true, home: true, x: 10, y: 50, z: 90 },
     portas: { name: "Portas V", layer: 2, faction: 'breen', supply: true, home: true, x: 5, y: 50, z: 85 },
     dozaria: { name: "Dozaria", layer: 2, faction: 'breen', supply: true, home: true, x: 15, y: 50, z: 95 },
     breen_core: { name: "Breen Core", layer: 2, faction: 'breen', supply: true, home: true, x: 10, y: 50, z: 100 },
-    breen_citadel: { name: "Breen Citadel", layer: 2, faction: 'breen', supply: true, home: true, x: 5, y: 50, z: 95 },
-    breen_fortress: { name: "Breen Fortress", layer: 2, faction: 'breen', supply: true, home: true, x: 0, y: 50, z: 90 },
+    breen_citadel: { name: "Breen Citadel", layer: 2, faction: 'breen', supply: true, home: false, x: 5, y: 50, z: 95 },
+    breen_fortress: { name: "Breen Fortress", layer: 2, faction: 'breen', supply: true, home: false, x: 0, y: 50, z: 90 },
     
     // -- Breen Chokepoint --
     frozen_passage: { name: "Frozen Passage", layer: 2, faction: 'neutral', supply: false, x: 20, y: 50, z: 85 },

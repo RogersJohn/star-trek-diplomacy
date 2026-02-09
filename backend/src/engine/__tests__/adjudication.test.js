@@ -1146,3 +1146,51 @@ describe('Position Utilities', () => {
     expect(isAdjacent('earth:orbit', 'vulcan', 'fleet')).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Data Integrity (Phase 1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Data Integrity', () => {
+  test('Breen has exactly 4 home systems in engine', () => {
+    expect(FACTIONS.breen.homeSystems).toHaveLength(4);
+    expect(FACTIONS.breen.homeSystems).toEqual(
+      expect.arrayContaining(['breen', 'portas', 'dozaria', 'breen_core'])
+    );
+  });
+
+  test('Breen has exactly 6 supply centers in map data', () => {
+    const breenSCs = Object.entries(SYSTEMS)
+      .filter(([_, s]) => s.faction === 'breen' && s.supply);
+    expect(breenSCs).toHaveLength(6);
+  });
+
+  test('Breen non-home supply centers cannot be used for builds', () => {
+    const state = freshState();
+    state.ownership['breen_citadel'] = 'breen';
+
+    const handler = new BuildPhaseHandler(state);
+    const locations = handler.getAvailableBuildLocations('breen');
+    expect(locations.armies).not.toContain('breen_citadel');
+    expect(locations.fleets).not.toContain('breen_citadel:orbit');
+  });
+
+  test('All faction starting unit counts match FACTIONS config', () => {
+    const state = new GameState();
+    state.initialize();
+    Object.entries(FACTIONS).forEach(([factionId, faction]) => {
+      const units = state.getUnits(factionId);
+      expect(units.length).toBe(faction.startingUnits.length);
+    });
+  });
+
+  test('Every home system in FACTIONS exists in SYSTEMS with correct faction and supply', () => {
+    Object.entries(FACTIONS).forEach(([factionId, faction]) => {
+      faction.homeSystems.forEach(planet => {
+        expect(SYSTEMS[planet]).toBeDefined();
+        expect(SYSTEMS[planet].faction).toBe(factionId);
+        expect(SYSTEMS[planet].supply).toBe(true);
+      });
+    });
+  });
+});

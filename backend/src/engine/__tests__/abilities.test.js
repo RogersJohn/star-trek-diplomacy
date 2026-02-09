@@ -438,3 +438,39 @@ describe('Latinum Economy', () => {
         expect(economy.canAfford('ferengi', 25)).toBe(false);
     });
 });
+
+describe('Latinum Economy Scope', () => {
+    test('Only Ferengi receives latinum income', () => {
+        const economy = new LatinumEconomy();
+        economy.initialize(['federation', 'klingon', 'ferengi']);
+
+        const mockState = {
+            countSupplyCenters: (faction) => {
+                if (faction === 'ferengi') return 3;
+                if (faction === 'federation') return 5;
+                if (faction === 'klingon') return 5;
+                return 0;
+            },
+            turn: 1,
+        };
+
+        economy.processIncome(mockState);
+
+        expect(economy.getBalance('ferengi')).toBeGreaterThan(0);
+        expect(economy.getBalance('federation')).toBe(0);
+        expect(economy.getBalance('klingon')).toBe(0);
+    });
+
+    test('Latinum income is not floored', () => {
+        const economy = new LatinumEconomy();
+        economy.initialize(['ferengi']);
+
+        const mockState = {
+            countSupplyCenters: () => 3, // 3 * 0.5 = 1.5
+            turn: 1,
+        };
+
+        economy.processIncome(mockState);
+        expect(economy.getBalance('ferengi')).toBe(1.5);
+    });
+});
