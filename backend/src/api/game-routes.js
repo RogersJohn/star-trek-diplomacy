@@ -215,6 +215,15 @@ router.post('/:gameId/ability', requireAuth, requireFactionOwnership, (req, res)
   res.json(result);
 });
 
+// Set Romulan spy target for this turn
+router.post('/:gameId/spy-target', requireAuth, requireFactionOwnership, (req, res) => {
+  const { targetFaction } = req.body;
+  const game = games.get(req.params.gameId);
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const result = game.setRomulanSpyTarget(req.verifiedFaction, targetFaction);
+  res.json(result);
+});
+
 // Check deadline and identify delinquent players (can be called by any player in game)
 router.post('/:gameId/check-deadline', requireAuth, attachUserFaction, async (req, res) => {
   const game = games.get(req.params.gameId);

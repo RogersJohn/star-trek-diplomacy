@@ -13,18 +13,18 @@ const FACTION_ABILITIES = {
     },
     klingon: {
         name: "Warrior's Rage",
-        description: "+1 attack strength, -1 defense strength (glass cannon)",
+        description: "+1 attack on first move order each turn. -1 defense when holding without fleet in orbit.",
         passive: true,
-        effect: 'attack_bonus_defense_penalty',
+        effect: 'first_strike',
         attackBonus: 1,
-        defensePenalty: 1
+        defensePenaltyNoFleet: 1,
+        maxBonusMoves: 1
     },
     romulan: {
         name: "Tal Shiar Intelligence",
-        description: "Each turn, reveal 1-2 random enemy orders before resolution",
+        description: "Each turn, choose one enemy faction and see all their orders before resolution.",
         passive: true,
-        effect: 'reveal_orders',
-        ordersRevealed: { min: 1, max: 2 }
+        effect: 'spy_on_faction',
     },
     cardassian: {
         name: "Obsidian Order",
@@ -34,12 +34,13 @@ const FACTION_ABILITIES = {
     },
     ferengi: {
         name: "Rules of Acquisition",
-        description: "Earn latinum from supply centers. Spend 15 latinum to bribe a neutral SC. Spend 25 latinum to sabotage one enemy support.",
+        description: "Earn 3 latinum per supply center each Fall. Spend 10 to bribe a neutral SC, 15 to sabotage an enemy support, 8 to spy on one faction's orders.",
         passive: true,
         effect: 'latinum_master',
-        incomePerSC: 0.5,
-        bribeCost: 15,
-        sabotageCost: 25
+        incomePerSC: 3,
+        bribeCost: 10,
+        sabotageCost: 15,
+        espionageCost: 8,
     },
     breen: {
         name: "Energy Dampening Weapon",
@@ -49,10 +50,9 @@ const FACTION_ABILITIES = {
     },
     gorn: {
         name: "Reptilian Resilience",
-        description: "50% chance to survive destruction and return to nearest home system",
+        description: "When dislodged with no valid retreats, automatically return to nearest unoccupied home system instead of being disbanded.",
         passive: true,
-        effect: 'survival_chance',
-        survivalChance: 0.5
+        effect: 'guaranteed_retreat_home',
     }
 };
 
@@ -76,20 +76,19 @@ class LatinumEconomy {
     }
     
     processIncome(gameState) {
-        Object.keys(this.balances).forEach(faction => {
-            const scs = gameState.countSupplyCenters(faction);
-            const ability = FACTION_ABILITIES[faction];
-            const rate = ability?.incomePerSC || 0.33;
-            const income = Math.floor(scs * rate);
-            
-            this.balances[faction] += income;
-            this.transactions.push({
-                turn: gameState.turn,
-                faction,
-                type: 'income',
-                amount: income,
-                balance: this.balances[faction]
-            });
+        // Latinum income is Ferengi-exclusive per rules
+        const ferengiRate = FACTION_ABILITIES.ferengi.incomePerSC;
+        const ferengiSCs = gameState.countSupplyCenters('ferengi');
+        const income = ferengiSCs * ferengiRate;
+
+        if (!this.balances['ferengi']) this.balances['ferengi'] = 0;
+        this.balances['ferengi'] += income;
+        this.transactions.push({
+            turn: gameState.turn,
+            faction: 'ferengi',
+            type: 'income',
+            amount: income,
+            balance: this.balances['ferengi']
         });
     }
     
@@ -141,23 +140,22 @@ class AbilityManager {
         return this.protectedLocations;
     }
     
-    // Klingon: Glass cannon (applied during adjudication)
+    // Klingon: First strike (applied during order processing in game-manager)
     getKlingonModifiers() {
         return {
             attackBonus: FACTION_ABILITIES.klingon.attackBonus,
-            defensePenalty: FACTION_ABILITIES.klingon.defensePenalty
+            defensePenaltyNoFleet: FACTION_ABILITIES.klingon.defensePenaltyNoFleet
         };
     }
     
-    // Romulan: Reveal orders
-    useIntelligence(enemyOrders) {
-        const numToReveal = Math.floor(Math.random() * 2) + 1;
-        const allOrders = Object.entries(enemyOrders)
-            .filter(([f]) => f !== 'romulan')
-            .flatMap(([faction, orders]) => orders.map(o => ({ ...o, faction })));
-        
-        const shuffled = allOrders.sort(() => Math.random() - 0.5);
-        this.revealedOrders = shuffled.slice(0, numToReveal);
+    // Romulan: Spy on chosen faction
+    useIntelligence(enemyOrders, targetFaction = null) {
+        if (!targetFaction || targetFaction === 'romulan') {
+            this.revealedOrders = [];
+            return this.revealedOrders;
+        }
+        const targetOrders = enemyOrders[targetFaction] || [];
+        this.revealedOrders = targetOrders.map(o => ({ ...o, faction: targetFaction }));
         return this.revealedOrders;
     }
     
@@ -206,7 +204,25 @@ class AbilityManager {
     getSabotagedSupports() {
         return this.sabotagedSupports;
     }
-    
+
+    // Ferengi: Espionage — pay to reveal one faction's orders
+    buyEspionage(targetFaction, allOrders) {
+        const cost = FACTION_ABILITIES.ferengi.espionageCost;
+        if (!this.economy.canAfford('ferengi', cost)) {
+            return { success: false, reason: 'Insufficient latinum' };
+        }
+        if (targetFaction === 'ferengi') {
+            return { success: false, reason: 'Cannot spy on yourself' };
+        }
+        this.economy.spend('ferengi', cost, `Espionage on ${targetFaction}`);
+        const targetOrders = allOrders[targetFaction] || [];
+        return {
+            success: true,
+            orders: targetOrders.map(o => ({ ...o, faction: targetFaction })),
+            cost,
+        };
+    }
+
     // Breen: Freeze territory
     freezeTerritory(location) {
         if (this.usedAbilities['breen_freeze']) {
@@ -222,24 +238,24 @@ class AbilityManager {
         return this.frozenTerritories.includes(location);
     }
     
-    // Gorn: Survival check
-    checkGornResilience(faction, originalLocation) {
+    // Gorn: Deterministic resilience — only triggers when no valid retreats
+    checkGornResilience(faction, originalLocation, retreatOptions = []) {
         if (faction !== 'gorn') return { survived: false };
-        
-        const chance = FACTION_ABILITIES.gorn.survivalChance;
-        if (Math.random() < chance) {
-            // Find nearest home system
-            const homeSystem = this.findNearestHomeSystem('gorn', originalLocation);
+        if (retreatOptions && retreatOptions.length > 0) return { survived: false };
+
+        const homeSystem = this.findNearestHomeSystem('gorn', originalLocation);
+        if (homeSystem) {
             return { survived: true, returnTo: homeSystem };
         }
         return { survived: false };
     }
-    
+
     findNearestHomeSystem(faction, from) {
         const { FACTIONS } = require('./diplomacy-engine');
         const homes = FACTIONS[faction]?.homeSystems || [];
-        // Return first available home (simplified)
-        return homes.find(h => !this.state.units[h]) || homes[0];
+        const available = homes.filter(h => !this.state.units[h]);
+        if (available.length === 0) return null;
+        return available[0];
     }
     
     // Reset per-turn abilities
