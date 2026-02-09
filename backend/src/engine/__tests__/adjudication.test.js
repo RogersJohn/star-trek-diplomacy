@@ -1148,6 +1148,147 @@ describe('Position Utilities', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Klingon First Strike (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Klingon First Strike (v2.1)', () => {
+  test('First Klingon move gets +1 attack', () => {
+    const state = freshState();
+    // qonos and narendra are adjacent
+    state.units['qonos'] = { faction: 'klingon', type: 'army' };
+    state.units['narendra'] = { faction: 'federation', type: 'army' };
+    state.units['narendra:orbit'] = { faction: 'federation', type: 'fleet' };
+
+    const adj = new Adjudicator(state);
+    adj.setOrders({
+      klingon: [
+        { type: 'move', location: 'qonos', destination: 'narendra', faction: 'klingon', klingonBonus: 1 },
+      ],
+      federation: [
+        { type: 'hold', location: 'narendra', faction: 'federation' },
+        { type: 'hold', location: 'narendra:orbit', faction: 'federation' },
+      ],
+    });
+    adj.adjudicate();
+    // Klingon attacks at 2, Federation defends at 1 (has fleet in orbit) -> Klingon wins
+    expect(state.units['narendra']?.faction).toBe('klingon');
+  });
+
+  test('Second Klingon move does NOT get +1 attack', () => {
+    const state = freshState();
+    // Two Klingon armies attacking two Federation positions
+    state.units['qonos'] = { faction: 'klingon', type: 'army' };
+    state.units['tygokor'] = { faction: 'klingon', type: 'army' };
+    state.units['narendra'] = { faction: 'federation', type: 'army' };
+    state.units['narendra:orbit'] = { faction: 'federation', type: 'fleet' };
+    state.units['archanis'] = { faction: 'federation', type: 'army' };
+    state.units['archanis:orbit'] = { faction: 'federation', type: 'fleet' };
+
+    const adj = new Adjudicator(state);
+    adj.setOrders({
+      klingon: [
+        // First move gets bonus
+        { type: 'move', location: 'qonos', destination: 'narendra', faction: 'klingon', klingonBonus: 1 },
+        // Second move does NOT get bonus
+        { type: 'move', location: 'tygokor', destination: 'archanis', faction: 'klingon' },
+      ],
+      federation: [
+        { type: 'hold', location: 'narendra', faction: 'federation' },
+        { type: 'hold', location: 'narendra:orbit', faction: 'federation' },
+        { type: 'hold', location: 'archanis', faction: 'federation' },
+        { type: 'hold', location: 'archanis:orbit', faction: 'federation' },
+      ],
+    });
+    adj.adjudicate();
+    // Second attack at 1 vs defense at 1 -> standoff, Federation holds
+    expect(state.units['archanis']?.faction).toBe('federation');
+  });
+
+  test('Klingon army without fleet in orbit defends at -1', () => {
+    const state = freshState();
+    // narendra is adjacent to qonos
+    state.units['qonos'] = { faction: 'klingon', type: 'army' };
+    // No fleet in orbit for Klingon
+    state.units['narendra'] = { faction: 'federation', type: 'army' };
+
+    const adj = new Adjudicator(state);
+    adj.setOrders({
+      federation: [
+        { type: 'move', location: 'narendra', destination: 'qonos', faction: 'federation' },
+      ],
+      klingon: [
+        { type: 'hold', location: 'qonos', faction: 'klingon' },
+      ],
+    });
+    adj.adjudicate();
+    // Federation attacks at 1, Klingon defends at 1 - 1 (Klingon penalty) - 1 (no fleet) = -1
+    // Federation wins
+    expect(state.units['qonos']?.faction).toBe('federation');
+  });
+
+  test('Klingon army WITH fleet in orbit defends at normal 1', () => {
+    const state = freshState();
+    state.units['qonos'] = { faction: 'klingon', type: 'army' };
+    state.units['qonos:orbit'] = { faction: 'klingon', type: 'fleet' };
+    state.units['narendra'] = { faction: 'federation', type: 'army' };
+
+    const adj = new Adjudicator(state);
+    adj.setOrders({
+      federation: [
+        { type: 'move', location: 'narendra', destination: 'qonos', faction: 'federation' },
+      ],
+      klingon: [
+        { type: 'hold', location: 'qonos', faction: 'klingon' },
+        { type: 'hold', location: 'qonos:orbit', faction: 'klingon' },
+      ],
+    });
+    adj.adjudicate();
+    // Federation attacks at 1, Klingon defends at 1 (fleet covers both penalties) -> standoff
+    expect(state.units['qonos']?.faction).toBe('klingon');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Gorn Deterministic Resilience (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Gorn Deterministic Resilience (v2.1)', () => {
+  test('Gorn unit with no retreats goes to home system', () => {
+    const state = freshState();
+    const { AbilityManager } = require('../faction-abilities');
+    const abilities = new AbilityManager(state, null);
+
+    const result = abilities.checkGornResilience('gorn', 'neutral_zone', []);
+    expect(result.survived).toBe(true);
+    expect(result.returnTo).toBeDefined();
+    expect(FACTIONS.gorn.homeSystems).toContain(result.returnTo);
+  });
+
+  test('Gorn unit WITH valid retreats does not trigger resilience', () => {
+    const state = freshState();
+    const { AbilityManager } = require('../faction-abilities');
+    const abilities = new AbilityManager(state, null);
+
+    const result = abilities.checkGornResilience('gorn', 'neutral_zone', ['badlands']);
+    expect(result.survived).toBe(false);
+  });
+
+  test('Gorn unit with all home systems occupied is disbanded', () => {
+    const state = freshState();
+    // Fill all Gorn home systems
+    FACTIONS.gorn.homeSystems.forEach(h => {
+      state.units[h] = { faction: 'gorn', type: 'army' };
+    });
+
+    const { AbilityManager } = require('../faction-abilities');
+    const abilities = new AbilityManager(state, null);
+
+    const result = abilities.checkGornResilience('gorn', 'cestus', []);
+    expect(result.survived).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Data Integrity (Phase 1)
 // ═══════════════════════════════════════════════════════════════════════════════
 

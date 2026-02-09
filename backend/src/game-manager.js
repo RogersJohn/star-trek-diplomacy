@@ -57,6 +57,9 @@ class GameManager {
     this.kickVotes = {};                // { targetFaction: [votingFactions] }
     this.kickedPlayers = [];            // Factions that have been kicked
 
+    // Romulan spy target for current turn
+    this.romulanSpyTarget = null;
+
     // Set initial deadline for first turn if timer is configured
     if (this.settings.turnTimerDays) {
       this.turnDeadline = this.calculateDeadline();
@@ -131,9 +134,12 @@ class GameManager {
         .map(([loc]) => loc);
     }
 
-    // Romulan: See revealed enemy orders
+    // Romulan: See revealed enemy orders + spy target info
     if (faction === 'romulan') {
       data.revealedOrders = this.abilities.revealedOrders || [];
+      data.spyTarget = this.romulanSpyTarget;
+      data.availableTargets = Object.keys(this.playerFactions)
+        .filter(f => f !== 'romulan' && !this.state.isEliminated(f));
     }
 
     // Cardassian: See enemy move destinations
@@ -160,6 +166,23 @@ class GameManager {
     }
 
     return data;
+  }
+
+  /**
+   * Set Romulan spy target for this turn
+   */
+  setRomulanSpyTarget(faction, targetFaction) {
+    if (faction !== 'romulan') {
+      return { success: false, reason: 'Only Romulan can use Tal Shiar' };
+    }
+    if (targetFaction === 'romulan') {
+      return { success: false, reason: 'Cannot spy on yourself' };
+    }
+    if (this.state.isEliminated(targetFaction)) {
+      return { success: false, reason: 'Target faction is eliminated' };
+    }
+    this.romulanSpyTarget = targetFaction;
+    return { success: true, target: targetFaction };
   }
 
   /**
@@ -236,23 +259,21 @@ class GameManager {
    * Resolve order phase
    */
   resolveOrders() {
-    // Trigger Romulan intelligence (Phase 4)
+    // Trigger Romulan intelligence — spy on chosen faction
     if (this.playerFactions['romulan'] && !this.state.isEliminated('romulan')) {
-      this.abilities.useIntelligence(this.pendingOrders);
+      this.abilities.useIntelligence(this.pendingOrders, this.romulanSpyTarget);
+      this.romulanSpyTarget = null;
     }
 
-    // Apply Klingon bonuses/penalties
-    Object.values(this.pendingOrders)
-      .flat()
-      .forEach(order => {
-        if (order.faction === 'klingon') {
-          if (order.type === 'move') {
-            order.klingonBonus = FACTION_ABILITIES.klingon.attackBonus;
-          } else {
-            order.klingonPenalty = FACTION_ABILITIES.klingon.defensePenalty;
-          }
-        }
-      });
+    // Apply Klingon first-strike: only the FIRST move order gets +1 attack
+    const klingonOrders = this.pendingOrders['klingon'] || [];
+    let klingonBonusApplied = false;
+    klingonOrders.forEach(order => {
+      if (order.type === 'move' && !klingonBonusApplied) {
+        order.klingonBonus = FACTION_ABILITIES.klingon.attackBonus;
+        klingonBonusApplied = true;
+      }
+    });
 
     // Adjudicate
     const adjudicator = new Adjudicator(this.state);
@@ -268,7 +289,7 @@ class GameManager {
     const survivalRolls = [];
     Object.entries(this.state.dislodged).forEach(([location, dislodged]) => {
       if (dislodged.faction === 'gorn') {
-        const resilience = this.abilities.checkGornResilience('gorn', location);
+        const resilience = this.abilities.checkGornResilience('gorn', location, dislodged.retreatOptions);
         survivalRolls.push({
           location,
           survived: resilience.survived,
@@ -366,7 +387,7 @@ class GameManager {
     // Disband any remaining dislodged (check Gorn resilience first)
     Object.entries(this.state.dislodged).forEach(([loc, dislodged]) => {
       if (dislodged.faction === 'gorn') {
-        const resilience = this.abilities.checkGornResilience('gorn', loc);
+        const resilience = this.abilities.checkGornResilience('gorn', loc, dislodged.retreatOptions);
         if (resilience.survived) {
           this.state.placeUnit(resilience.returnTo, {
             faction: 'gorn',
@@ -759,6 +780,8 @@ class GameManager {
       delinquentPlayers: this.delinquentPlayers,
       kickVotes: this.kickVotes,
       kickedPlayers: this.kickedPlayers,
+      // Romulan spy target
+      romulanSpyTarget: this.romulanSpyTarget,
     };
   }
 
@@ -806,6 +829,7 @@ class GameManager {
     game.delinquentPlayers = data.delinquentPlayers || [];
     game.kickVotes = data.kickVotes || {};
     game.kickedPlayers = data.kickedPlayers || [];
+    game.romulanSpyTarget = data.romulanSpyTarget || null;
 
     return game;
   }

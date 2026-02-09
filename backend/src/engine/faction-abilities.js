@@ -13,18 +13,18 @@ const FACTION_ABILITIES = {
     },
     klingon: {
         name: "Warrior's Rage",
-        description: "+1 attack strength, -1 defense strength (glass cannon)",
+        description: "+1 attack on first move order each turn. -1 defense when holding without fleet in orbit.",
         passive: true,
-        effect: 'attack_bonus_defense_penalty',
+        effect: 'first_strike',
         attackBonus: 1,
-        defensePenalty: 1
+        defensePenaltyNoFleet: 1,
+        maxBonusMoves: 1
     },
     romulan: {
         name: "Tal Shiar Intelligence",
-        description: "Each turn, reveal 1-2 random enemy orders before resolution",
+        description: "Each turn, choose one enemy faction and see all their orders before resolution.",
         passive: true,
-        effect: 'reveal_orders',
-        ordersRevealed: { min: 1, max: 2 }
+        effect: 'spy_on_faction',
     },
     cardassian: {
         name: "Obsidian Order",
@@ -49,10 +49,9 @@ const FACTION_ABILITIES = {
     },
     gorn: {
         name: "Reptilian Resilience",
-        description: "50% chance to survive destruction and return to nearest home system",
+        description: "When dislodged with no valid retreats, automatically return to nearest unoccupied home system instead of being disbanded.",
         passive: true,
-        effect: 'survival_chance',
-        survivalChance: 0.5
+        effect: 'guaranteed_retreat_home',
     }
 };
 
@@ -140,23 +139,22 @@ class AbilityManager {
         return this.protectedLocations;
     }
     
-    // Klingon: Glass cannon (applied during adjudication)
+    // Klingon: First strike (applied during order processing in game-manager)
     getKlingonModifiers() {
         return {
             attackBonus: FACTION_ABILITIES.klingon.attackBonus,
-            defensePenalty: FACTION_ABILITIES.klingon.defensePenalty
+            defensePenaltyNoFleet: FACTION_ABILITIES.klingon.defensePenaltyNoFleet
         };
     }
     
-    // Romulan: Reveal orders
-    useIntelligence(enemyOrders) {
-        const numToReveal = Math.floor(Math.random() * 2) + 1;
-        const allOrders = Object.entries(enemyOrders)
-            .filter(([f]) => f !== 'romulan')
-            .flatMap(([faction, orders]) => orders.map(o => ({ ...o, faction })));
-        
-        const shuffled = allOrders.sort(() => Math.random() - 0.5);
-        this.revealedOrders = shuffled.slice(0, numToReveal);
+    // Romulan: Spy on chosen faction
+    useIntelligence(enemyOrders, targetFaction = null) {
+        if (!targetFaction || targetFaction === 'romulan') {
+            this.revealedOrders = [];
+            return this.revealedOrders;
+        }
+        const targetOrders = enemyOrders[targetFaction] || [];
+        this.revealedOrders = targetOrders.map(o => ({ ...o, faction: targetFaction }));
         return this.revealedOrders;
     }
     
@@ -221,24 +219,24 @@ class AbilityManager {
         return this.frozenTerritories.includes(location);
     }
     
-    // Gorn: Survival check
-    checkGornResilience(faction, originalLocation) {
+    // Gorn: Deterministic resilience — only triggers when no valid retreats
+    checkGornResilience(faction, originalLocation, retreatOptions = []) {
         if (faction !== 'gorn') return { survived: false };
-        
-        const chance = FACTION_ABILITIES.gorn.survivalChance;
-        if (Math.random() < chance) {
-            // Find nearest home system
-            const homeSystem = this.findNearestHomeSystem('gorn', originalLocation);
+        if (retreatOptions && retreatOptions.length > 0) return { survived: false };
+
+        const homeSystem = this.findNearestHomeSystem('gorn', originalLocation);
+        if (homeSystem) {
             return { survived: true, returnTo: homeSystem };
         }
         return { survived: false };
     }
-    
+
     findNearestHomeSystem(faction, from) {
         const { FACTIONS } = require('./diplomacy-engine');
         const homes = FACTIONS[faction]?.homeSystems || [];
-        // Return first available home (simplified)
-        return homes.find(h => !this.state.units[h]) || homes[0];
+        const available = homes.filter(h => !this.state.units[h]);
+        if (available.length === 0) return null;
+        return available[0];
     }
     
     // Reset per-turn abilities

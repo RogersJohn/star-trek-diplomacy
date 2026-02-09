@@ -272,7 +272,7 @@ describe('Ferengi Sabotage', () => {
     });
 });
 
-describe('Romulan Intelligence', () => {
+describe('Romulan Intelligence (v2.1)', () => {
     let state, economy, abilities;
 
     beforeEach(() => {
@@ -283,32 +283,40 @@ describe('Romulan Intelligence', () => {
         abilities = new AbilityManager(state, economy);
     });
 
-    test('reveals 1-2 enemy orders', () => {
+    test('choosing a target reveals all their orders', () => {
         const orders = {
-            federation: [{ type: 'move', location: 'earth', destination: 'vulcan' }],
+            federation: [
+                { type: 'move', location: 'earth', destination: 'vulcan' },
+                { type: 'hold', location: 'andoria' }
+            ],
             klingon: [{ type: 'move', location: 'qonos', destination: 'tygokor' }],
             romulan: [{ type: 'hold', location: 'romulus' }]
         };
 
-        const revealed = abilities.useIntelligence(orders);
+        const revealed = abilities.useIntelligence(orders, 'federation');
 
-        expect(revealed.length).toBeGreaterThanOrEqual(1);
-        expect(revealed.length).toBeLessThanOrEqual(2);
-        // Should not reveal Romulan's own orders
-        expect(revealed.every(o => o.faction !== 'romulan')).toBe(true);
+        expect(revealed).toHaveLength(2);
+        expect(revealed.every(o => o.faction === 'federation')).toBe(true);
     });
 
-    test('revealed orders have faction info', () => {
+    test('no target selected reveals nothing', () => {
         const orders = {
             federation: [{ type: 'move', location: 'earth', destination: 'vulcan' }],
             romulan: [{ type: 'hold', location: 'romulus' }]
         };
 
-        const revealed = abilities.useIntelligence(orders);
+        const revealed = abilities.useIntelligence(orders, null);
+        expect(revealed).toHaveLength(0);
+    });
 
-        revealed.forEach(order => {
-            expect(order.faction).toBeDefined();
-        });
+    test('cannot spy on own faction', () => {
+        const orders = {
+            federation: [{ type: 'move', location: 'earth', destination: 'vulcan' }],
+            romulan: [{ type: 'hold', location: 'romulus' }]
+        };
+
+        const revealed = abilities.useIntelligence(orders, 'romulan');
+        expect(revealed).toHaveLength(0);
     });
 });
 
@@ -347,17 +355,19 @@ describe('Cardassian Obsidian Order', () => {
     });
 });
 
-describe('Klingon Warriors Rage', () => {
+describe('Klingon Warriors Rage (v2.1)', () => {
     test('attack bonus defined correctly', () => {
         expect(FACTION_ABILITIES.klingon.attackBonus).toBe(1);
     });
 
-    test('defense penalty defined correctly', () => {
-        expect(FACTION_ABILITIES.klingon.defensePenalty).toBe(1);
+    test('first strike config defined correctly', () => {
+        expect(FACTION_ABILITIES.klingon.effect).toBe('first_strike');
+        expect(FACTION_ABILITIES.klingon.maxBonusMoves).toBe(1);
+        expect(FACTION_ABILITIES.klingon.defensePenaltyNoFleet).toBe(1);
     });
 });
 
-describe('Gorn Resilience', () => {
+describe('Gorn Deterministic Resilience (v2.1)', () => {
     let state, economy, abilities;
 
     beforeEach(() => {
@@ -368,37 +378,36 @@ describe('Gorn Resilience', () => {
         abilities = new AbilityManager(state, economy);
     });
 
-    test('50% survival chance defined', () => {
-        expect(FACTION_ABILITIES.gorn.survivalChance).toBe(0.5);
+    test('guaranteed retreat home config defined correctly', () => {
+        expect(FACTION_ABILITIES.gorn.effect).toBe('guaranteed_retreat_home');
+        expect(FACTION_ABILITIES.gorn.survivalChance).toBeUndefined();
     });
 
-    test('survival returns to home system', () => {
-        // Mock random to always survive
-        const originalRandom = Math.random;
-        Math.random = () => 0.1; // Below 0.5, so survives
-
-        const result = abilities.checkGornResilience('gorn', 'neutral_zone');
+    test('unit with no retreat options goes to home system', () => {
+        const result = abilities.checkGornResilience('gorn', 'neutral_zone', []);
 
         expect(result.survived).toBe(true);
         expect(FACTIONS.gorn.homeSystems).toContain(result.returnTo);
-
-        Math.random = originalRandom;
     });
 
-    test('failure when roll is high', () => {
-        // Mock random to always fail
-        const originalRandom = Math.random;
-        Math.random = () => 0.9; // Above 0.5, so fails
-
-        const result = abilities.checkGornResilience('gorn', 'neutral_zone');
+    test('unit WITH valid retreats does NOT trigger resilience', () => {
+        const result = abilities.checkGornResilience('gorn', 'neutral_zone', ['badlands']);
 
         expect(result.survived).toBe(false);
+    });
 
-        Math.random = originalRandom;
+    test('unit with all home systems occupied is disbanded', () => {
+        // Fill all Gorn home systems
+        FACTIONS.gorn.homeSystems.forEach(h => {
+            state.units[h] = { faction: 'gorn', type: 'army' };
+        });
+
+        const result = abilities.checkGornResilience('gorn', 'neutral_zone', []);
+        expect(result.survived).toBe(false);
     });
 
     test('only applies to Gorn faction', () => {
-        const result = abilities.checkGornResilience('federation', 'earth');
+        const result = abilities.checkGornResilience('federation', 'earth', []);
         expect(result.survived).toBe(false);
     });
 });

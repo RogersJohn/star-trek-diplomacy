@@ -842,10 +842,14 @@ class Adjudicator {
 
     let strength = 1;
 
-    // Klingon defense penalty
-    const defenderOrder = this.orders.find(o => o.location === destination && o.faction === defender.faction);
-    if (defenderOrder?.klingonPenalty) {
-      strength -= defenderOrder.klingonPenalty;
+    // Klingon defense penalty: applies ONLY when holding without friendly fleet in orbit
+    if (defender.faction === 'klingon' && posType === POSITION_TYPES.PLANET && defender.type === UNIT_TYPES.ARMY) {
+      const klingonOrbitPos = getOrbitPosition(destination);
+      const klingonOrbitUnit = preResolutionUnits[klingonOrbitPos];
+      const hasKlingonFleet = klingonOrbitUnit && klingonOrbitUnit.faction === 'klingon';
+      if (!hasKlingonFleet) {
+        strength -= 1;
+      }
     }
 
     // Fleet-in-orbit defense bonus: army gets -1 if no friendly fleet in orbit
