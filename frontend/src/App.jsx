@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from '@clerk/clerk-react'
 import Home from './components/Home'
 import Lobby from './components/Lobby'
 import Game from './components/Game'
+import MapDemo from './components/MapDemo'
 
-function App() {
+function AuthenticatedApp() {
   const { isLoaded } = useUser();
 
   if (!isLoaded) {
@@ -17,14 +18,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-space-dark text-white">
-      {/* User Button in top right */}
       <SignedIn>
         <div className="absolute top-4 right-4 z-50">
           <UserButton />
         </div>
       </SignedIn>
 
-      {/* Show sign in button when not authenticated */}
       <SignedOut>
         <div className="flex flex-col items-center justify-center min-h-screen">
           <h1 className="text-4xl font-bold text-lcars-orange mb-8">Star Trek Diplomacy</h1>
@@ -47,6 +46,16 @@ function App() {
       </SignedIn>
     </div>
   )
+}
+
+function App() {
+  const location = useLocation();
+
+  if (location.pathname === '/map-demo') {
+    return <MapDemo />
+  }
+
+  return <AuthenticatedApp />
 }
 
 export default App

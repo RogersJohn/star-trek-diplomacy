@@ -6,21 +6,21 @@
  * 7 Factions, Turkey-style Breen position
  */
 
-// Layer 3: Upper Hyperspace (bypass routes, no supply)
-// Layer 2: Core Sector (all supply centers)
-// Layer 1: Lower Hyperspace (bypass routes, no supply)
+// Layer 3: Upper Hyperspace (bypass routes, some neutral supply centers)
+// Layer 2: Core Sector (faction and neutral supply centers)
+// Layer 1: Lower Hyperspace (bypass routes, some neutral supply centers)
 
 const SYSTEMS = {
     // ========== LAYER 3: UPPER HYPERSPACE ==========
-    hyperspace_alpha: { name: "Hyperspace Alpha", layer: 3, faction: 'deepspace', supply: false, x: 0, y: 100, z: 0 },
+    hyperspace_alpha: { name: "Hyperspace Alpha", layer: 3, faction: 'neutral', supply: true, x: 0, y: 100, z: 0 },
     hyperspace_beta: { name: "Hyperspace Beta", layer: 3, faction: 'deepspace', supply: false, x: 50, y: 100, z: 0 },
-    hyperspace_gamma: { name: "Hyperspace Gamma", layer: 3, faction: 'deepspace', supply: false, x: 100, y: 100, z: 0 },
+    hyperspace_gamma: { name: "Hyperspace Gamma", layer: 3, faction: 'neutral', supply: true, x: 100, y: 100, z: 0 },
     hyperspace_delta: { name: "Hyperspace Delta", layer: 3, faction: 'deepspace', supply: false, x: 50, y: 100, z: 50 },
     transwarp_north: { name: "Transwarp North", layer: 3, faction: 'deepspace', supply: false, x: 25, y: 100, z: 25 },
     transwarp_south: { name: "Transwarp South", layer: 3, faction: 'deepspace', supply: false, x: 75, y: 100, z: 25 },
-    wormhole_terminus_a: { name: "Wormhole Terminus A", layer: 3, faction: 'deepspace', supply: false, x: 25, y: 100, z: 75 },
+    wormhole_terminus_a: { name: "Wormhole Terminus A", layer: 3, faction: 'neutral', supply: true, x: 25, y: 100, z: 75 },
     wormhole_terminus_b: { name: "Wormhole Terminus B", layer: 3, faction: 'deepspace', supply: false, x: 75, y: 100, z: 75 },
-    quantum_corridor: { name: "Quantum Corridor", layer: 3, faction: 'deepspace', supply: false, x: 50, y: 100, z: 100 },
+    quantum_corridor: { name: "Quantum Corridor", layer: 3, faction: 'neutral', supply: true, x: 50, y: 100, z: 100 },
     void_passage: { name: "Void Passage", layer: 3, faction: 'deepspace', supply: false, x: 100, y: 100, z: 100 },
 
     // ========== LAYER 2: CORE SECTOR ==========
@@ -93,13 +93,13 @@ const SYSTEMS = {
     gamma_outpost: { name: "Gamma Outpost", layer: 2, faction: 'neutral', supply: true, x: 35, y: 50, z: 80 },
 
     // ========== LAYER 1: LOWER HYPERSPACE ==========
-    underspace_alpha: { name: "Underspace Alpha", layer: 1, faction: 'deepspace', supply: false, x: 0, y: 0, z: 0 },
+    underspace_alpha: { name: "Underspace Alpha", layer: 1, faction: 'neutral', supply: true, x: 0, y: 0, z: 0 },
     underspace_beta: { name: "Underspace Beta", layer: 1, faction: 'deepspace', supply: false, x: 50, y: 0, z: 0 },
-    underspace_gamma: { name: "Underspace Gamma", layer: 1, faction: 'deepspace', supply: false, x: 100, y: 0, z: 0 },
+    underspace_gamma: { name: "Underspace Gamma", layer: 1, faction: 'neutral', supply: true, x: 100, y: 0, z: 0 },
     underspace_delta: { name: "Underspace Delta", layer: 1, faction: 'deepspace', supply: false, x: 50, y: 0, z: 50 },
     mycelial_north: { name: "Mycelial North", layer: 1, faction: 'deepspace', supply: false, x: 25, y: 0, z: 25 },
     mycelial_south: { name: "Mycelial South", layer: 1, faction: 'deepspace', supply: false, x: 75, y: 0, z: 25 },
-    quantum_realm: { name: "Quantum Realm", layer: 1, faction: 'deepspace', supply: false, x: 50, y: 0, z: 75 },
+    quantum_realm: { name: "Quantum Realm", layer: 1, faction: 'neutral', supply: true, x: 50, y: 0, z: 75 },
     mirror_passage: { name: "Mirror Passage", layer: 1, faction: 'deepspace', supply: false, x: 50, y: 0, z: 100 },
 };
 

@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { Line } from '@react-three/drei'
 import { FACTION_COLORS } from '@star-trek-diplomacy/shared'
 
 export default function HyperlaneEdge({
@@ -9,6 +10,7 @@ export default function HyperlaneEdge({
   isVertical,
   fleetsOnEdge,
   isSelected,
+  isHighlighted,
   isValidDest,
   onClick,
   onPointerOver,
@@ -36,26 +38,52 @@ export default function HyperlaneEdge({
       perp.set(1, 0, 0)
     }
 
-    return { midpoint: mid.toArray(), length: len, quaternion: quat, perpOffset: perp.multiplyScalar(0.12).toArray() }
+    return { midpoint: mid.toArray(), length: len, quaternion: quat, perpOffset: perp.multiplyScalar(0.5).toArray() }
   }, [startPos, endPos])
 
-  const lineColor = isValidDest ? '#4ade80' : isSelected ? '#ffffff' : isVertical ? '#554433' : '#334455'
-  const lineOpacity = isValidDest ? 0.8 : 0.4
+  const points = useMemo(() => [startPos, endPos], [startPos, endPos])
+
+  // Determine line style
+  const active = isValidDest || isSelected || isHighlighted
+  let lineColor = isVertical ? '#554433' : '#334455'
+  let lineWidth = 1.5
+  let lineOpacity = 0.5
+
+  if (isValidDest) {
+    lineColor = '#4ade80'
+    lineWidth = 3
+    lineOpacity = 0.9
+  } else if (isSelected) {
+    lineColor = '#ffffff'
+    lineWidth = 3
+    lineOpacity = 0.9
+  } else if (isHighlighted) {
+    lineColor = '#ffaa00'
+    lineWidth = 2.5
+    lineOpacity = 0.8
+  }
 
   return (
     <group>
-      {/* Visible line */}
-      <line>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={2}
-            array={new Float32Array([...startPos, ...endPos])}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <lineBasicMaterial color={lineColor} transparent opacity={lineOpacity} />
-      </line>
+      {/* Main visible line using drei Line (Line2 — supports real pixel widths) */}
+      <Line
+        points={points}
+        color={lineColor}
+        lineWidth={lineWidth}
+        transparent
+        opacity={lineOpacity}
+      />
+
+      {/* Glow overlay for active states */}
+      {active && (
+        <Line
+          points={points}
+          color={lineColor}
+          lineWidth={lineWidth * 3}
+          transparent
+          opacity={0.15}
+        />
+      )}
 
       {/* Invisible clickable cylinder */}
       <mesh
@@ -66,14 +94,14 @@ export default function HyperlaneEdge({
         onPointerOver={(e) => { e.stopPropagation(); onPointerOver?.(edgeId) }}
         onPointerOut={(e) => { e.stopPropagation(); onPointerOut?.() }}
       >
-        <cylinderGeometry args={[0.08, 0.08, length, 6]} />
+        <cylinderGeometry args={[0.3, 0.3, length, 6]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
-      {/* Valid destination glow */}
+      {/* Valid destination glow cylinder */}
       {isValidDest && (
         <mesh position={midpoint} quaternion={quaternion}>
-          <cylinderGeometry args={[0.06, 0.06, length, 6]} />
+          <cylinderGeometry args={[0.2, 0.2, length, 6]} />
           <meshBasicMaterial color="#4ade80" transparent opacity={0.15} />
         </mesh>
       )}
@@ -81,8 +109,12 @@ export default function HyperlaneEdge({
       {/* Fleet indicators at midpoint */}
       {fleetsOnEdge && fleetsOnEdge.length === 1 && (
         <mesh position={midpoint} rotation={[0, 0, Math.PI]}>
-          <coneGeometry args={[0.08, 0.2, 6]} />
-          <meshStandardMaterial color={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'} />
+          <coneGeometry args={[0.3, 0.7, 6]} />
+          <meshStandardMaterial
+            color={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'}
+            emissive={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'}
+            emissiveIntensity={0.4}
+          />
         </mesh>
       )}
 
@@ -96,8 +128,12 @@ export default function HyperlaneEdge({
             ]}
             rotation={[0, 0, Math.PI]}
           >
-            <coneGeometry args={[0.07, 0.18, 6]} />
-            <meshStandardMaterial color={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'} />
+            <coneGeometry args={[0.25, 0.6, 6]} />
+            <meshStandardMaterial
+              color={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'}
+              emissive={FACTION_COLORS[fleetsOnEdge[0].faction] || '#fff'}
+              emissiveIntensity={0.4}
+            />
           </mesh>
           <mesh
             position={[
@@ -107,8 +143,12 @@ export default function HyperlaneEdge({
             ]}
             rotation={[0, 0, Math.PI]}
           >
-            <coneGeometry args={[0.07, 0.18, 6]} />
-            <meshStandardMaterial color={FACTION_COLORS[fleetsOnEdge[1].faction] || '#fff'} />
+            <coneGeometry args={[0.25, 0.6, 6]} />
+            <meshStandardMaterial
+              color={FACTION_COLORS[fleetsOnEdge[1].faction] || '#fff'}
+              emissive={FACTION_COLORS[fleetsOnEdge[1].faction] || '#fff'}
+              emissiveIntensity={0.4}
+            />
           </mesh>
         </>
       )}

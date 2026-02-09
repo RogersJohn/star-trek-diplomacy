@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { OrbitControls, Stars, Line } from '@react-three/drei'
 import { SYSTEMS, HYPERLANES, VERTICAL_LANES, ALL_EDGES, FACTION_COLORS } from '@star-trek-diplomacy/shared'
-import { isEdgePosition, parseEdgeId } from '../../utils/edge-utils'
-import SystemNode, { toWorldPos } from './SystemNode'
+import { isEdgePosition, isPlanetPosition, isOrbitPosition, parseEdgeId, isPlanetEndpointOfEdge } from '../../utils/edge-utils'
+import SystemNode, { SYSTEM_POSITIONS } from './SystemNode'
 import HyperlaneEdge from './HyperlaneEdge'
 
 export default function Map3D({
@@ -16,8 +16,9 @@ export default function Map3D({
 }) {
   const [hoveredPosition, setHoveredPosition] = useState(null)
   const [layerVisibility, setLayerVisibility] = useState({ 1: true, 2: true, 3: true })
+  const [clickedPlanet, setClickedPlanet] = useState(null)
 
-  // Build edge data with world positions
+  // Build edge data with world positions from precomputed SYSTEM_POSITIONS
   const edgeData = useMemo(() => {
     const allPairs = [
       ...HYPERLANES.map(([a, b]) => ({ a, b, isVertical: false })),
@@ -34,17 +35,39 @@ export default function Map3D({
       const sysA = SYSTEMS[a]
       const sysB = SYSTEMS[b]
       if (!sysA || !sysB) return null
+      const posA = SYSTEM_POSITIONS[a]
+      const posB = SYSTEM_POSITIONS[b]
+      if (!posA || !posB) return null
       const edgeId = [a, b].sort().join('~')
       return {
         edgeId,
-        startPos: toWorldPos(sysA),
-        endPos: toWorldPos(sysB),
+        startPos: posA,
+        endPos: posB,
         isVertical,
         layerA: sysA.layer,
         layerB: sysB.layer,
       }
     }).filter(Boolean)
   }, [])
+
+  // Compute connected edges and planets for clickedPlanet
+  const { connectedEdges, connectedPlanets } = useMemo(() => {
+    if (!clickedPlanet) return { connectedEdges: new Set(), connectedPlanets: new Set() }
+
+    const edges = new Set()
+    const planets = new Set()
+
+    ALL_EDGES.forEach(edgeId => {
+      if (isPlanetEndpointOfEdge(clickedPlanet, edgeId)) {
+        edges.add(edgeId)
+        const [a, b] = parseEdgeId(edgeId)
+        const other = a === clickedPlanet ? b : a
+        planets.add(other)
+      }
+    })
+
+    return { connectedEdges: edges, connectedPlanets: planets }
+  }, [clickedPlanet])
 
   // Filter systems by layer visibility
   const visibleSystems = useMemo(() => {
@@ -67,7 +90,9 @@ export default function Map3D({
     const owner = gameState?.ownership?.[systemId]
     if (owner) return FACTION_COLORS[owner]
     if (SYSTEMS[systemId]?.supply) return '#888888'
-    return '#333333'
+    const layer = SYSTEMS[systemId]?.layer
+    if (layer === 1 || layer === 3) return '#4477aa'
+    return '#555566'
   }
 
   // Get fleets on an edge
@@ -76,6 +101,19 @@ export default function Map3D({
     if (Array.isArray(units)) return units
     return []
   }
+
+  // Handle planet click — toggle click-highlight, also forward to parent
+  const handlePositionClick = useCallback((positionId) => {
+    if (isPlanetPosition(positionId)) {
+      setClickedPlanet(prev => prev === positionId ? null : positionId)
+    } else if (isOrbitPosition(positionId)) {
+      const planet = positionId.replace(':orbit', '')
+      setClickedPlanet(prev => prev === planet ? null : planet)
+    } else {
+      setClickedPlanet(null)
+    }
+    onPositionClick(positionId)
+  }, [onPositionClick])
 
   return (
     <div className="w-full h-full relative">
@@ -94,13 +132,14 @@ export default function Map3D({
         ))}
       </div>
 
-      <Canvas camera={{ position: [0, 12, 8], fov: 50 }}>
-        <ambientLight intensity={0.4} />
-        <pointLight position={[10, 10, 10]} intensity={0.6} />
-        <Stars radius={50} depth={50} count={2000} factor={3} saturation={0} />
+      <Canvas camera={{ position: [0, 50, 70], fov: 50 }}>
+        <ambientLight intensity={0.3} />
+        <pointLight position={[40, 40, 40]} intensity={0.6} />
+        <pointLight position={[-30, -20, -30]} intensity={0.3} color="#4488ff" />
+        <Stars radius={250} depth={250} count={5000} factor={4} saturation={0.2} />
         <OrbitControls
-          minDistance={3}
-          maxDistance={25}
+          minDistance={5}
+          maxDistance={200}
           enableDamping
           dampingFactor={0.1}
           touches={{ ONE: 0, TWO: 2 }}
@@ -117,10 +156,11 @@ export default function Map3D({
             orbitUnit={gameState?.units?.[id + ':orbit'] || null}
             isSelected={selectedUnit === id || selectedUnit === id + ':orbit'}
             isHovered={hoveredPosition === id || hoveredPosition === id + ':orbit'}
+            isHighlighted={connectedPlanets.has(id) || clickedPlanet === id}
             isValidDest={validDestsSet.has(id)}
             isOrbitValidDest={validDestsSet.has(id + ':orbit')}
             hasPendingOrder={pendingLocations.has(id) || pendingLocations.has(id + ':orbit')}
-            onClick={onPositionClick}
+            onClick={handlePositionClick}
             onPointerOver={setHoveredPosition}
             onPointerOut={() => setHoveredPosition(null)}
           />
@@ -136,8 +176,9 @@ export default function Map3D({
             isVertical={edge.isVertical}
             fleetsOnEdge={getFleetsOnEdge(edge.edgeId)}
             isSelected={selectedUnit === edge.edgeId}
+            isHighlighted={connectedEdges.has(edge.edgeId)}
             isValidDest={validDestsSet.has(edge.edgeId)}
-            onClick={onPositionClick}
+            onClick={handlePositionClick}
             onPointerOver={setHoveredPosition}
             onPointerOut={() => setHoveredPosition(null)}
           />
@@ -151,17 +192,12 @@ export default function Map3D({
           if (!fromPos || !toPos) return null
 
           return (
-            <line key={`order-arrow-${i}`}>
-              <bufferGeometry>
-                <bufferAttribute
-                  attach="attributes-position"
-                  count={2}
-                  array={new Float32Array([...fromPos, ...toPos])}
-                  itemSize={3}
-                />
-              </bufferGeometry>
-              <lineBasicMaterial color="#f59e0b" linewidth={2} />
-            </line>
+            <Line
+              key={`order-arrow-${i}`}
+              points={[fromPos, toPos]}
+              color="#f59e0b"
+              lineWidth={2}
+            />
           )
         })}
       </Canvas>
@@ -175,17 +211,13 @@ function getWorldPosition(position) {
 
   if (isEdgePosition(position)) {
     const [a, b] = parseEdgeId(position)
-    const sysA = SYSTEMS[a]
-    const sysB = SYSTEMS[b]
-    if (!sysA || !sysB) return null
-    const posA = toWorldPos(sysA)
-    const posB = toWorldPos(sysB)
+    const posA = SYSTEM_POSITIONS[a]
+    const posB = SYSTEM_POSITIONS[b]
+    if (!posA || !posB) return null
     return [(posA[0] + posB[0]) / 2, (posA[1] + posB[1]) / 2, (posA[2] + posB[2]) / 2]
   }
 
   // Orbit position: same as planet
   const planetId = position.endsWith(':orbit') ? position.replace(':orbit', '') : position
-  const sys = SYSTEMS[planetId]
-  if (!sys) return null
-  return toWorldPos(sys)
+  return SYSTEM_POSITIONS[planetId] || null
 }
