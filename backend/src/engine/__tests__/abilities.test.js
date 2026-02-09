@@ -470,16 +470,91 @@ describe('Latinum Economy Scope', () => {
         expect(economy.getBalance('klingon')).toBe(0);
     });
 
-    test('Latinum income is not floored', () => {
+    test('Latinum income uses current rate per SC', () => {
         const economy = new LatinumEconomy();
         economy.initialize(['ferengi']);
 
         const mockState = {
-            countSupplyCenters: () => 3, // 3 * 0.5 = 1.5
+            countSupplyCenters: () => 3, // 3 * 3 = 9
             turn: 1,
         };
 
         economy.processIncome(mockState);
-        expect(economy.getBalance('ferengi')).toBe(1.5);
+        expect(economy.getBalance('ferengi')).toBe(9);
+    });
+});
+
+describe('Latinum Economy v2.1', () => {
+    test('Ferengi earns 3 latinum per SC per turn', () => {
+        const economy = new LatinumEconomy();
+        economy.initialize(['ferengi']);
+
+        const mockState = {
+            countSupplyCenters: () => 4,
+            turn: 1,
+        };
+
+        economy.processIncome(mockState);
+        expect(economy.getBalance('ferengi')).toBe(12);
+    });
+
+    test('Espionage costs 8 latinum and reveals target orders', () => {
+        const state = new GameState();
+        state.initialize();
+        const economy = new LatinumEconomy();
+        economy.initialize(['ferengi', 'federation']);
+        economy.balances['ferengi'] = 20;
+        const abilities = new AbilityManager(state, economy);
+
+        const allOrders = {
+            federation: [
+                { type: 'move', location: 'earth', destination: 'vulcan' },
+                { type: 'hold', location: 'andoria' },
+            ],
+            ferengi: [{ type: 'hold', location: 'ferenginar' }],
+        };
+
+        const result = abilities.buyEspionage('federation', allOrders);
+
+        expect(result.success).toBe(true);
+        expect(result.orders).toHaveLength(2);
+        expect(result.orders.every(o => o.faction === 'federation')).toBe(true);
+        expect(result.cost).toBe(8);
+        expect(economy.getBalance('ferengi')).toBe(12);
+    });
+
+    test('Bribe costs 10 latinum', () => {
+        const state = new GameState();
+        state.initialize();
+        const economy = new LatinumEconomy();
+        economy.initialize(['ferengi']);
+        economy.balances['ferengi'] = 15;
+        const abilities = new AbilityManager(state, economy);
+
+        const neutralSC = Object.entries(SYSTEMS).find(
+            ([id, sys]) => sys.supply && !state.ownership[id]
+        );
+
+        if (neutralSC) {
+            const context = { systems: SYSTEMS, ownership: state.ownership };
+            const result = abilities.bribeNeutralSC(neutralSC[0], context);
+
+            expect(result.success).toBe(true);
+            expect(economy.getBalance('ferengi')).toBe(5);
+        }
+    });
+
+    test('Sabotage costs 15 latinum', () => {
+        const state = new GameState();
+        state.initialize();
+        const economy = new LatinumEconomy();
+        economy.initialize(['ferengi', 'federation']);
+        economy.balances['ferengi'] = 20;
+        const abilities = new AbilityManager(state, economy);
+
+        const result = abilities.sabotageSupport('federation', 'earth');
+
+        expect(result.success).toBe(true);
+        expect(economy.getBalance('ferengi')).toBe(5);
     });
 });

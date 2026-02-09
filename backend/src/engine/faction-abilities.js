@@ -34,12 +34,13 @@ const FACTION_ABILITIES = {
     },
     ferengi: {
         name: "Rules of Acquisition",
-        description: "Earn latinum from supply centers. Spend 15 latinum to bribe a neutral SC. Spend 25 latinum to sabotage one enemy support.",
+        description: "Earn 3 latinum per supply center each Fall. Spend 10 to bribe a neutral SC, 15 to sabotage an enemy support, 8 to spy on one faction's orders.",
         passive: true,
         effect: 'latinum_master',
-        incomePerSC: 0.5,
-        bribeCost: 15,
-        sabotageCost: 25
+        incomePerSC: 3,
+        bribeCost: 10,
+        sabotageCost: 15,
+        espionageCost: 8,
     },
     breen: {
         name: "Energy Dampening Weapon",
@@ -203,7 +204,25 @@ class AbilityManager {
     getSabotagedSupports() {
         return this.sabotagedSupports;
     }
-    
+
+    // Ferengi: Espionage — pay to reveal one faction's orders
+    buyEspionage(targetFaction, allOrders) {
+        const cost = FACTION_ABILITIES.ferengi.espionageCost;
+        if (!this.economy.canAfford('ferengi', cost)) {
+            return { success: false, reason: 'Insufficient latinum' };
+        }
+        if (targetFaction === 'ferengi') {
+            return { success: false, reason: 'Cannot spy on yourself' };
+        }
+        this.economy.spend('ferengi', cost, `Espionage on ${targetFaction}`);
+        const targetOrders = allOrders[targetFaction] || [];
+        return {
+            success: true,
+            orders: targetOrders.map(o => ({ ...o, faction: targetFaction })),
+            cost,
+        };
+    }
+
     // Breen: Freeze territory
     freezeTerritory(location) {
         if (this.usedAbilities['breen_freeze']) {

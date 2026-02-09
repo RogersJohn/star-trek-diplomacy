@@ -152,6 +152,7 @@ class GameManager {
       data.latinumBalance = this.economy.getBalance('ferengi');
       data.bribeCost = FACTION_ABILITIES.ferengi.bribeCost;
       data.sabotageCost = FACTION_ABILITIES.ferengi.sabotageCost;
+      data.espionageCost = FACTION_ABILITIES.ferengi.espionageCost;
     }
 
     // Breen: Freeze ability status
@@ -635,6 +636,9 @@ class GameManager {
 
       case 'sabotage':
         return this.abilities.sabotageSupport(params.targetFaction, params.targetLocation);
+
+      case 'espionage':
+        return this.abilities.buyEspionage(params.targetFaction, this.pendingOrders);
 
       default:
         return { success: false, reason: 'Unknown ability' };

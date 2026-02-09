@@ -134,7 +134,7 @@ const VICTORY_CONDITIONS = {
   klingon: { supplyCenters: 10 },
   romulan: { supplyCenters: 8 },
   cardassian: { supplyCenters: 10 },
-  ferengi: { supplyCenters: 8, latinum: 100 },
+  ferengi: { supplyCenters: 8, latinum: 50 },
   breen: { supplyCenters: 10 },
   gorn: { supplyCenters: 9 },
 };

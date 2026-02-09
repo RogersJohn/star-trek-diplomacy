@@ -1093,7 +1093,7 @@ describe('Victory Conditions', () => {
   });
 
   test('48. Ferengi latinum victory condition exists', () => {
-    expect(VICTORY_CONDITIONS.ferengi.latinum).toBe(100);
+    expect(VICTORY_CONDITIONS.ferengi.latinum).toBe(50);
     expect(VICTORY_CONDITIONS.ferengi.supplyCenters).toBe(8);
   });
 });
