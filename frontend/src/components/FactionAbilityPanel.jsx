@@ -201,13 +201,15 @@ export default function FactionAbilityPanel({ gameState, onUseAbility }) {
   // Ferengi: Rules of Acquisition
   const renderFerengiAbility = () => {
     const balance = abilityData?.latinumBalance || 0;
-    const bribeCost = abilityData?.bribeCost || 15;
-    const sabotageCost = abilityData?.sabotageCost || 25;
+    const bribeCost = abilityData?.bribeCost || 10;
+    const sabotageCost = abilityData?.sabotageCost || 15;
+    const espionageCost = abilityData?.espionageCost || 8;
     const neutralSCs = getNeutralSupplyCenters();
     const enemyFactions = getEnemyFactions();
 
     const [bribeTarget, setBribeTarget] = useState(null);
     const [sabotageTarget, setSabotageTarget] = useState(null);
+    const [espionageTarget, setEspionageTarget] = useState(null);
 
     return (
       <div className="space-y-3">
@@ -218,7 +220,7 @@ export default function FactionAbilityPanel({ gameState, onUseAbility }) {
         {/* Latinum Balance */}
         <div className="bg-yellow-900/30 p-3 rounded">
           <div className="text-2xl font-bold text-yellow-400">💰 {balance} Latinum</div>
-          <div className="text-xs text-gray-400 mt-1">Earn 0.5 per supply center each turn</div>
+          <div className="text-xs text-gray-400 mt-1">Earn 3 latinum per supply center each Fall</div>
         </div>
 
         {/* Bribe Action */}
@@ -305,6 +307,53 @@ export default function FactionAbilityPanel({ gameState, onUseAbility }) {
               </button>
               <button
                 onClick={() => setSabotageTarget(null)}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Espionage Action */}
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Espionage ({espionageCost} latinum)</div>
+          {!espionageTarget ? (
+            <>
+              {enemyFactions.length > 0 ? (
+                <select
+                  className="w-full px-2 py-1 bg-gray-800 rounded text-sm"
+                  onChange={e => setEspionageTarget(e.target.value)}
+                  value=""
+                >
+                  <option value="">Select faction to spy on...</option>
+                  {enemyFactions.map(f => (
+                    <option key={f} value={f}>
+                      {FACTION_NAMES[f]}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-gray-500 text-xs">No enemy factions available</div>
+              )}
+            </>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                data-testid="ferengi-espionage-btn"
+                onClick={() => {
+                  if (balance >= espionageCost) {
+                    onUseAbility('espionage', { targetFaction: espionageTarget });
+                    setEspionageTarget(null);
+                  }
+                }}
+                disabled={balance < espionageCost}
+                className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm transition-colors"
+              >
+                Spy on {FACTION_NAMES[espionageTarget]}
+              </button>
+              <button
+                onClick={() => setEspionageTarget(null)}
                 className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
               >
                 Cancel
