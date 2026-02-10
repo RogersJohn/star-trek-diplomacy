@@ -4,6 +4,8 @@ import Home from './components/Home'
 import Lobby from './components/Lobby'
 import Game from './components/Game'
 import MapDemo from './components/MapDemo'
+import SinglePlayerSetup from './components/SinglePlayerSetup'
+import SinglePlayerGame from './components/SinglePlayerGame'
 
 function AuthenticatedApp() {
   const { isLoaded } = useUser();
@@ -33,6 +35,12 @@ function AuthenticatedApp() {
               Sign In
             </button>
           </SignInButton>
+          <button
+            onClick={() => window.location.href = '/singleplayer'}
+            className="mt-4 px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold text-lg rounded"
+          >
+            Play vs AI
+          </button>
         </div>
       </SignedOut>
 
@@ -53,6 +61,15 @@ function App() {
 
   if (location.pathname === '/map-demo') {
     return <MapDemo />
+  }
+
+  if (location.pathname.startsWith('/singleplayer')) {
+    return (
+      <Routes>
+        <Route path="/singleplayer" element={<SinglePlayerSetup />} />
+        <Route path="/singleplayer/:gameId" element={<SinglePlayerGame />} />
+      </Routes>
+    )
   }
 
   return <AuthenticatedApp />
