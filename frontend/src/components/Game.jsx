@@ -56,8 +56,6 @@ export default function Game() {
 
   // Handle break alliance
   const handleBreakAlliance = async (faction) => {
-    const { useGameStore } = await import('../hooks/useGameStore');
-    const state = useGameStore.getState();
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${await getToken()}`,
