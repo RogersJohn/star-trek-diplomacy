@@ -222,6 +222,31 @@ docker-compose up --build
 
 ---
 
+## v2.1 Changelog
+
+### Balance Changes
+- Klingon: +1 attack on first move only (was all moves). Defense penalty only without fleet in orbit.
+- Gorn: Deterministic resilience (was 50% random). Only triggers when no valid retreats.
+- Romulan: Choose spy target each turn, see all their orders (was 1-2 random orders).
+- Ferengi: Income 3/SC (was 0.5), bribe 10 (was 15), sabotage 15 (was 25), new espionage ability (8). Victory at 50 latinum (was 100).
+
+### Data Fixes
+- Breen: breen_citadel and breen_fortress are no longer marked as home systems in map-data.js (still Breen supply centers)
+- Latinum economy is now Ferengi-exclusive (was bugged to give all factions income)
+- Non-adjacent army moves are now flagged as requiring convoy at validation time
+- Duplicate order detection added
+
+### UX Improvements
+- SVG zoom/pan on 2D map
+- Always-visible labels for supply centers
+- Orbit rings around planets
+- Wider hyperlane click targets
+- Individual order undo
+- Hyperspace layer toggle
+- Phase/turn overlay on map
+
+---
+
 ## Don't Do These Things
 
 - Don't bypass Clerk auth - there is no dev mode
