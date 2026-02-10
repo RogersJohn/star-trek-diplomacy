@@ -16,6 +16,7 @@ const gameRoutes = require('./api/game-routes');
 const lobbyRoutes = require('./api/lobby-routes');
 const userRoutes = require('./api/user-routes');
 const testRoutes = require('./api/test-routes');
+const singleplayerRoutes = require('./api/singleplayer-routes');
 const GameManager = require('./game-manager');
 const { games } = require('./api/game-routes');
 const { initializeDatabase, closeDatabase, getUserFactionInGame } = require('./database');
@@ -38,7 +39,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes
+// API Routes (singleplayer first — no auth required)
+app.use('/api/singleplayer', singleplayerRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/lobby', lobbyRoutes);
 app.use('/api/user', userRoutes);
