@@ -102,11 +102,35 @@ export default function FactionAbilityPanel({ gameState, onUseAbility }) {
   // Romulan: Tal Shiar Intelligence
   const renderRomulanAbility = () => {
     const revealedOrders = abilityData?.revealedOrders || [];
+    const availableTargets = abilityData?.availableTargets || [];
+    const spyTarget = abilityData?.spyTarget;
 
     return (
       <div className="space-y-2">
         <div className="text-xs text-gray-400">
-          Passive: Reveal 1-2 random enemy orders each turn
+          Each turn, choose one enemy faction to spy on. All their orders will be revealed before resolution.
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Choose Spy Target:</div>
+          <select
+            data-testid="spy-target-select"
+            className="w-full px-2 py-1 bg-gray-800 rounded text-sm"
+            value={spyTarget || ''}
+            onChange={e => {
+              if (e.target.value) {
+                onUseAbility('spy_target', { targetFaction: e.target.value });
+              }
+            }}
+          >
+            <option value="">Select faction to spy on...</option>
+            {availableTargets.map(f => (
+              <option key={f} value={f}>{FACTION_NAMES[f]}</option>
+            ))}
+          </select>
+          {spyTarget && (
+            <div className="text-green-400 text-sm">Spying on: {FACTION_NAMES[spyTarget]}</div>
+          )}
         </div>
 
         {revealedOrders.length > 0 ? (

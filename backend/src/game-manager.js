@@ -663,6 +663,9 @@ class GameManager {
       case 'espionage':
         return this.abilities.buyEspionage(params.targetFaction, this.pendingOrders);
 
+      case 'spy_target':
+        return this.setRomulanSpyTarget(faction, params.targetFaction);
+
       default:
         return { success: false, reason: 'Unknown ability' };
     }
