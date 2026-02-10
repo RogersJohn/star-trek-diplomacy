@@ -96,6 +96,49 @@ class GamePage {
     return By.xpath("//button[contains(text(), 'Use') or contains(text(), 'Activate')]");
   }
 
+  // Selectors - v2.1 Romulan Spy Target
+  get romulanSpyTargetSelect() {
+    return By.css('[data-testid="spy-target-select"]');
+  }
+
+  // Selectors - v2.1 Ferengi Latinum
+  get ferengiLatinumDisplay() {
+    return By.css('[data-testid="latinum-balance"]');
+  }
+
+  get ferengiBribeButton() {
+    return By.xpath("//button[contains(text(), 'Bribe')]");
+  }
+
+  get ferengiSabotageButton() {
+    return By.xpath("//button[contains(text(), 'Sabotage')]");
+  }
+
+  get ferengiEspionageButton() {
+    return By.xpath("//button[contains(text(), 'Espionage')]");
+  }
+
+  // Selectors - v2.1 Map UX
+  get zoomResetButton() {
+    return By.xpath("//button[contains(text(), 'Reset View')]");
+  }
+
+  get hyperspaceToggle() {
+    return By.xpath("//button[contains(text(), 'Hyperspace')]");
+  }
+
+  get phaseOverlay() {
+    return By.css('.absolute.top-4.left-1\\/2');
+  }
+
+  get orbitRings() {
+    return By.css('circle[stroke-dasharray]');
+  }
+
+  get removeOrderButtons() {
+    return By.css('[data-testid="remove-order"]');
+  }
+
   // Selectors - Messages
   get messagesPanel() {
     return By.xpath("//*[contains(text(), 'Messages') or contains(text(), 'Diplomatic')]");
@@ -413,6 +456,141 @@ class GamePage {
       return true;
     } catch (e) {
       return false;
+    }
+  }
+
+  // Actions - v2.1 Ferengi Latinum
+  async getLatinumBalance() {
+    const el = await this.driver.findElement(this.ferengiLatinumDisplay);
+    return parseFloat(await el.getText());
+  }
+
+  async hasLatinumDisplay() {
+    try {
+      await this.driver.findElement(this.ferengiLatinumDisplay);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Actions - v2.1 Romulan Spy Target
+  async selectSpyTarget(faction) {
+    const select = await this.driver.findElement(this.romulanSpyTargetSelect);
+    await select.click();
+    const option = await this.driver.findElement(By.xpath(`//option[contains(text(), '${faction}')]`));
+    await option.click();
+  }
+
+  async hasSpyTargetSelector() {
+    try {
+      await this.driver.findElement(this.romulanSpyTargetSelect);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Actions - v2.1 Order Removal
+  async removeOrder(index) {
+    const removeButtons = await this.driver.findElements(this.removeOrderButtons);
+    if (removeButtons[index]) {
+      await removeButtons[index].click();
+    }
+  }
+
+  async getRemoveOrderButtonCount() {
+    try {
+      const buttons = await this.driver.findElements(this.removeOrderButtons);
+      return buttons.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Actions - v2.1 Map UX
+  async zoomIn() {
+    const svg = await this.driver.findElement(By.css('svg'));
+    await this.driver.executeScript(
+      "arguments[0].dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true }))",
+      svg
+    );
+  }
+
+  async zoomOut() {
+    const svg = await this.driver.findElement(By.css('svg'));
+    await this.driver.executeScript(
+      "arguments[0].dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true }))",
+      svg
+    );
+  }
+
+  async resetView() {
+    const btn = await this.driver.findElement(this.zoomResetButton);
+    await btn.click();
+  }
+
+  async toggleHyperspace() {
+    const btn = await this.driver.findElement(this.hyperspaceToggle);
+    await btn.click();
+  }
+
+  async hasHyperspaceToggle() {
+    try {
+      await this.driver.findElement(this.hyperspaceToggle);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async hasZoomResetButton() {
+    try {
+      await this.driver.findElement(this.zoomResetButton);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async hasPhaseOverlay() {
+    try {
+      await this.driver.findElement(this.phaseOverlay);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getPhaseOverlayText() {
+    try {
+      const el = await this.driver.findElement(this.phaseOverlay);
+      return await el.getText();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async getSvgViewBox() {
+    const svg = await this.driver.findElement(By.css('svg'));
+    return await svg.getAttribute('viewBox');
+  }
+
+  async getOrbitRingCount() {
+    try {
+      const rings = await this.driver.findElements(this.orbitRings);
+      return rings.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  async getSupplyCenterLabelCount() {
+    try {
+      const labels = await this.driver.findElements(By.css('svg text.pointer-events-none'));
+      return labels.length;
+    } catch (e) {
+      return 0;
     }
   }
 }
