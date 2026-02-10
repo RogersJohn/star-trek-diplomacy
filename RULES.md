@@ -1,6 +1,6 @@
 # Star Trek Diplomacy - Official Rules
 
-**Version 2.0**
+**Version 2.1**
 
 A 7-player strategy game of interstellar conquest and negotiation set in the Star Trek universe. Based on classic Diplomacy mechanics with dual-unit system, asymmetric faction abilities, and a 3-layer map.
 
@@ -46,8 +46,8 @@ Star Trek Diplomacy is a game of negotiation, strategy, and careful timing. Seve
 | **Klingon Empire** | 2 (Qo'noS, Ty'Gokor) | 3 (Qo'noS, Narendra, Boreth) | 5 | 10 SC |
 | **Romulan Star Empire** | 2 (Romulus, Remus) | 2 (Romulus, Rator) | 4 | 8 SC |
 | **Cardassian Union** | 3 (Cardassia, Chin'toka, Septimus) | 2 (Cardassia, Kelvas) | 5 | 10 SC |
-| **Ferengi Alliance** | 2 (Ferenginar, Volchok) | 1 (Ferenginar) | 3 | 8 SC or 100 latinum |
-| **Breen Confederacy** | 2 (Breen, Portas) | 2 (Breen, Dozaria) | 4 | 10 SC |
+| **Ferengi Alliance** | 2 (Ferenginar, Volchok) | 1 (Ferenginar) | 3 | 8 SC or 50 latinum |
+| **Breen Confederacy** | 2 (Breen, Portas) | 2 (Breen, Dozaria) | 4 (Breen, Portas, Dozaria, Breen Core) | 10 SC |
 | **Gorn Hegemony** | 3 (Gornar, S'sgaron, Seudath) | 2 (Gornar, Gorn Fortress) | 5 | 9 SC |
 
 ---
@@ -204,8 +204,8 @@ All orders resolve simultaneously:
 ### Combat Strength
 - Base strength: **1**
 - Each valid support: **+1**
-- Klingon attacking: **+1** (faction ability)
-- Klingon defending: **-1** (faction ability)
+- Klingon first attack: **+1** (faction ability, first MOVE order only)
+- Klingon defending without fleet in orbit: **-1** (faction ability, stacks with standard penalty)
 - Army without friendly fleet in orbit: **-1 defense**
 
 ### Fleet-in-Orbit Defense Bonus
@@ -287,7 +287,7 @@ Victory is checked at the end of each Fall Build Phase.
 | Klingon | 10 supply centers |
 | Romulan | 8 supply centers |
 | Cardassian | 10 supply centers |
-| Ferengi | 8 supply centers OR 100 latinum |
+| Ferengi | 8 supply centers OR 50 latinum |
 | Breen | 10 supply centers |
 | Gorn | 9 supply centers |
 
@@ -344,24 +344,26 @@ Each faction has a unique ability. Abilities are either **passive** (always acti
 
 **Type:** Passive
 
-**Effect:** +1 attack strength on all MOVE orders. -1 defense on HOLD.
+**Effect:** +1 attack strength on the **first** MOVE order each turn. When holding without a friendly fleet in orbit, -1 defense (stacks with the standard fleet-in-orbit penalty for -2 total).
 
 | Situation | Strength |
 |-----------|----------|
-| Attacking (MOVE) | 1 + 1 = **2** |
-| Defending (HOLD) | 1 - 1 = **0** |
-| Attacking with 1 support | 2 + 1 = **3** |
-| Defending with 1 support | 0 + 1 = **1** |
+| First attack (MOVE) | 1 + 1 = **2** |
+| Additional attacks (MOVE) | **1** (normal) |
+| Defending with fleet in orbit | **1** (normal) |
+| Defending without fleet in orbit | 1 - 1 (Klingon) - 1 (no fleet) = **-1** |
 
-Keep Klingon units moving or well-supported.
+Choose your first strike wisely. Keep fleet cover on defensive positions.
 
 ---
 
 ### Romulan: Tal Shiar Intelligence
 
-**Type:** Passive (each turn)
+**Type:** Active (each turn)
 
-**Effect:** Before resolution, 1-2 random enemy orders are revealed to the Romulan player only. Resets each turn.
+**Effect:** Each turn during the orders phase, choose one enemy faction. After all orders are submitted but before resolution, all of that faction's orders are revealed to the Romulan player.
+
+**Usage:** Select a spy target from the ability panel during the orders phase. If no target is selected, no intelligence is gathered.
 
 ---
 
@@ -377,11 +379,12 @@ Keep Klingon units moving or well-supported.
 
 **Type:** Passive economy + Active abilities
 
-- Earn **0.5 latinum per supply center** each Fall Build Phase
-- **Bribe** (15 latinum): Claim a neutral supply center without a unit there
-- **Sabotage** (25 latinum): Cancel one enemy support order before resolution
+- Earn **3 latinum per supply center** each Fall Build Phase
+- **Bribe** (10 latinum): Claim a neutral supply center without a unit there
+- **Sabotage** (15 latinum): Cancel one enemy support order before resolution
+- **Espionage** (8 latinum): See all orders from one enemy faction this turn
 
-**Victory:** Ferengi can win by accumulating **100 latinum** instead of reaching the SC threshold.
+**Victory:** Ferengi can win by accumulating **50 latinum** instead of reaching the SC threshold.
 
 ---
 
@@ -397,7 +400,12 @@ Keep Klingon units moving or well-supported.
 
 **Type:** Passive
 
-**Effect:** When a Gorn unit is dislodged with no valid retreat, 50% chance to survive and teleport to the nearest unoccupied Gorn home system. If all home systems are occupied, the unit is disbanded.
+**Effect:** When a Gorn unit is dislodged and has **no valid retreat destinations**, it automatically returns to the nearest unoccupied Gorn home system instead of being disbanded.
+
+**Restrictions:**
+- Only triggers when there are zero valid retreats available
+- If all Gorn home systems are occupied, the unit is disbanded normally
+- If valid retreats exist, the Gorn player must choose a retreat as normal
 
 ---
 
@@ -406,18 +414,19 @@ Keep Klingon units moving or well-supported.
 Latinum is exclusive to the Ferengi Alliance.
 
 ### Earning
-- **0.5 latinum per supply center** per Fall Build Phase
+- **3 latinum per supply center** per Fall Build Phase (Ferengi only)
 - Accumulates across turns
 
 ### Spending
 
 | Action | Cost | Effect |
 |--------|------|--------|
-| Bribe | 15 | Claim a neutral supply center |
-| Sabotage | 25 | Cancel one enemy support order |
+| Bribe | 10 | Claim a neutral supply center |
+| Sabotage | 15 | Cancel one enemy support order |
+| Espionage | 8 | See all orders from one enemy faction |
 
 ### Economic Victory
-Ferengi wins immediately upon reaching **100 latinum** (checked during Build Phase).
+Ferengi wins immediately upon reaching **50 latinum** (checked during Build Phase).
 
 ---
 
@@ -427,8 +436,8 @@ Ferengi wins immediately upon reaching **100 latinum** (checked during Build Pha
 1. Orders -> 2. Resolution -> 3. Retreats -> (Fall only: 4. Builds)
 
 ### Combat Math
-- Attacker: 1 + supports (+1 if Klingon)
-- Defender: 1 + supports (-1 if Klingon, -1 if army without fleet in orbit)
+- Attacker: 1 + supports (+1 if Klingon first move)
+- Defender: 1 + supports (-1 if Klingon without fleet in orbit, -1 if army without fleet in orbit)
 - Higher wins; tie = standoff
 
 ### Movement Summary
