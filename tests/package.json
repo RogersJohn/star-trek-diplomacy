@@ -13,6 +13,7 @@
     "test:messaging": "jest --runInBand --testTimeout=120000 messaging.test.js",
     "test:ui": "jest --runInBand --testTimeout=120000 ui.test.js",
     "test:victory": "jest --runInBand --testTimeout=120000 victory.test.js",
+    "test:balance": "jest --runInBand --testTimeout=120000 balance-ui.test.js",
     "test:edge": "jest --runInBand --testTimeout=120000 edge-cases.test.js",
     "test:quick": "node multiplayer-test.js",
     "test:smoke": "jest --runInBand --testTimeout=120000 --testPathPattern=smoke"
