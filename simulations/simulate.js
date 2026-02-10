@@ -4,8 +4,9 @@
  * Usage:
  *   node simulate.js --games=1000 --strategy=random
  *   node simulate.js --games=500 --strategy=all --report
+ *   node simulate.js --games=100 --strategy=medium --report
  *
- * Strategies: random, aggressive, defensive, balanced, all (runs each)
+ * Strategies: random, easy, medium, hard, all (runs each)
  */
 
 const fs = require('fs');
@@ -19,17 +20,36 @@ const {
 const { SYSTEMS, HYPERLANES, VERTICAL_LANES } = require('@star-trek-diplomacy/shared');
 const { LatinumEconomy, FACTION_ABILITIES } = require('../backend/src/engine/faction-abilities');
 
-// Strategy imports
+// AI strategy imports
+const AIPlayer = require('../backend/src/engine/ai/ai-player');
+
+// Legacy random strategy (kept for comparison)
 const randomStrategy = require('./strategies/random');
-const aggressiveStrategy = require('./strategies/aggressive');
-const defensiveStrategy = require('./strategies/defensive');
-const balancedStrategy = require('./strategies/balanced');
+
+/**
+ * Wrap an AI difficulty level as a simulation strategy function.
+ * Returns a function with signature (faction, state) => orders[]
+ */
+function makeAIStrategy(difficulty) {
+    // Create one AIPlayer per faction, cached
+    const players = {};
+    Object.keys(FACTIONS).forEach(f => {
+        players[f] = new AIPlayer(f, difficulty);
+    });
+
+    return function aiStrategy(faction, state) {
+        const ai = players[faction];
+        if (!ai) return [];
+        const { orders } = ai.generateOrders(state);
+        return orders;
+    };
+}
 
 const STRATEGIES = {
     random: randomStrategy,
-    aggressive: aggressiveStrategy,
-    defensive: defensiveStrategy,
-    balanced: balancedStrategy,
+    easy: makeAIStrategy('easy'),
+    medium: makeAIStrategy('medium'),
+    hard: makeAIStrategy('hard'),
 };
 
 // Parse CLI args
