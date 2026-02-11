@@ -150,14 +150,26 @@ class SinglePlayerManager extends GameManager {
   }
 
   _submitAIRetreats() {
+    // Collect all retreats per faction first, then submit once per faction
+    const retreatsByFaction = {};
+
     Object.entries(this.state.dislodged).forEach(([location, dislodged]) => {
       if (dislodged.faction === this.humanFaction) return;
       const ai = this.aiPlayers[dislodged.faction];
       if (!ai) return;
-      if (this.pendingRetreats[dislodged.faction]) return;
 
+      if (!retreatsByFaction[dislodged.faction]) {
+        retreatsByFaction[dislodged.faction] = [];
+      }
       const retreat = ai.chooseRetreat(this.state, location, dislodged.retreatOptions);
-      this.submitRetreats(dislodged.faction, [retreat]);
+      retreatsByFaction[dislodged.faction].push(retreat);
+    });
+
+    // Submit collected retreats for each faction
+    Object.entries(retreatsByFaction).forEach(([faction, retreats]) => {
+      if (!this.pendingRetreats[faction]) {
+        this.submitRetreats(faction, retreats);
+      }
     });
   }
 
