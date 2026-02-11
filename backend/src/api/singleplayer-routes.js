@@ -103,12 +103,13 @@ router.post('/:gameId/ability', (req, res) => {
   const game = spGames.get(req.params.gameId);
   if (!game) return res.status(404).json({ success: false, reason: 'Game not found' });
 
-  const { abilityName, params } = req.body;
-  if (!abilityName) {
-    return res.status(400).json({ success: false, reason: 'abilityName is required' });
+  const { ability, abilityName, params } = req.body;
+  const resolvedAbility = ability || abilityName;
+  if (!resolvedAbility) {
+    return res.status(400).json({ success: false, reason: 'ability is required' });
   }
 
-  const result = game.useAbility(game.humanFaction, abilityName, params || {});
+  const result = game.useAbility(game.humanFaction, resolvedAbility, params || {});
   res.json(result);
 });
 
