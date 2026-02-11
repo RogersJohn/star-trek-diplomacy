@@ -69,28 +69,30 @@ class SinglePlayerManager extends GameManager {
    * Submit human retreats, then generate + submit AI retreats, then resolve.
    */
   submitHumanRetreats(retreats) {
-    const humanResult = this.submitRetreats(this.humanFaction, retreats);
+    // Check if human has any dislodged units — if not, just handle AI
+    const humanDislodged = Object.entries(this.state.dislodged)
+      .filter(([_, d]) => d.faction === this.humanFaction);
 
-    // If still waiting (for AI retreats), handle AI retreats
-    if (humanResult.waiting) {
-      this._submitAIRetreats();
+    if (humanDislodged.length > 0) {
+      const humanResult = this.submitRetreats(this.humanFaction, retreats);
+      if (!humanResult.success && !humanResult.waiting) {
+        // submitRetreats auto-resolved (human was last to submit)
+        return {
+          success: true,
+          resolution: humanResult,
+          gameState: this.getPublicState(),
+          playerState: this.getHumanState(),
+        };
+      }
     }
 
-    // Check if we need to resolve again after AI submission
-    if (this.phase === 'retreats') {
-      // All retreats should be submitted now, resolve
-      const resolution = this.resolveRetreats();
-      return {
-        success: true,
-        resolution,
-        gameState: this.getPublicState(),
-        playerState: this.getHumanState(),
-      };
-    }
+    // Submit AI retreats if any remain
+    this._submitAIRetreats();
 
+    // The last submitRetreats call may have auto-resolved.
+    // Return current state regardless.
     return {
       success: true,
-      resolution: humanResult,
       gameState: this.getPublicState(),
       playerState: this.getHumanState(),
     };
@@ -100,26 +102,27 @@ class SinglePlayerManager extends GameManager {
    * Submit human builds, then generate + submit AI builds, then resolve.
    */
   submitHumanBuilds(builds) {
-    const humanResult = this.submitBuilds(this.humanFaction, builds);
+    const buildCount = this.calculateBuilds(this.humanFaction);
 
-    // If still waiting, handle AI builds
-    if (humanResult.waiting) {
-      this._submitAIBuilds();
+    if (buildCount !== 0) {
+      const humanResult = this.submitBuilds(this.humanFaction, builds);
+      if (!humanResult.success && !humanResult.waiting) {
+        // submitBuilds auto-resolved (human was last to submit)
+        return {
+          success: true,
+          resolution: humanResult,
+          gameState: this.getPublicState(),
+          playerState: this.getHumanState(),
+        };
+      }
     }
 
-    if (this.phase === 'builds') {
-      const resolution = this.resolveBuilds();
-      return {
-        success: true,
-        resolution,
-        gameState: this.getPublicState(),
-        playerState: this.getHumanState(),
-      };
-    }
+    // Submit AI builds if any remain
+    this._submitAIBuilds();
 
+    // Return current state
     return {
       success: true,
-      resolution: humanResult,
       gameState: this.getPublicState(),
       playerState: this.getHumanState(),
     };
