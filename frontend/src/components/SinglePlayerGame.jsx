@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FACTION_COLORS, FACTION_NAMES } from '@star-trek-diplomacy/shared';
 import GameMap from './map/GameMap';
+import OrderPanel from './OrderPanel';
 import FactionAbilityPanel from './FactionAbilityPanel';
 import StatusBar from './StatusBar';
+import { useGameStore } from '../hooks/useGameStore';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -13,13 +15,14 @@ export default function SinglePlayerGame() {
 
   const [gameState, setGameState] = useState(null);
   const [playerState, setPlayerState] = useState(null);
-  const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [lastResults, setLastResults] = useState(null);
 
   const faction = playerState?.myFaction;
+
+  // Get store methods for order management (used by GameMap and OrderPanel)
+  const clearOrders = useGameStore(s => s.clearOrders);
 
   // Fetch game state
   const fetchState = useCallback(async () => {
@@ -41,103 +44,102 @@ export default function SinglePlayerGame() {
     }
   }, [gameId]);
 
+  // Initialize: set faction in store and clear orders
+  useEffect(() => {
+    if (faction) {
+      useGameStore.setState({ faction, gameId, pendingOrders: [], selectedUnit: null });
+    }
+  }, [faction, gameId]);
+
+  // Override the store's submitOrders to use singleplayer endpoint
+  useEffect(() => {
+    if (!gameId || !faction) return;
+
+    // Override submitOrders in the store for singleplayer
+    const originalSubmitOrders = useGameStore.getState().submitOrders;
+
+    useGameStore.setState({
+      submitOrders: async () => {
+        const { pendingOrders } = useGameStore.getState();
+        try {
+          const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orders: pendingOrders }),
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            setLastResults(result.resolution);
+            if (result.gameState) setGameState(result.gameState);
+            if (result.playerState) setPlayerState(result.playerState);
+            useGameStore.setState({ pendingOrders: [], selectedUnit: null });
+
+            // If we moved to retreats or builds, refresh
+            if (result.resolution?.phase === 'retreats' || result.resolution?.phase === 'builds') {
+              await fetchState();
+            }
+            return { success: true };
+          } else {
+            return { success: false, error: result.reason || result.errors?.map(e => e.reason).join(', ') || 'Failed' };
+          }
+        } catch (err) {
+          return { success: false, error: 'Failed to submit orders' };
+        }
+      },
+
+      submitRetreats: async (retreats) => {
+        try {
+          const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/retreats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ retreats }),
+          });
+          const result = await response.json();
+          if (result.success) {
+            if (result.gameState) setGameState(result.gameState);
+            if (result.playerState) setPlayerState(result.playerState);
+            useGameStore.setState({ pendingOrders: [], selectedUnit: null });
+          }
+          return result;
+        } catch (err) {
+          return { success: false, error: 'Failed to submit retreats' };
+        }
+      },
+
+      submitBuilds: async (builds) => {
+        try {
+          const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/builds`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ builds }),
+          });
+          const result = await response.json();
+          if (result.success) {
+            if (result.gameState) setGameState(result.gameState);
+            if (result.playerState) setPlayerState(result.playerState);
+            useGameStore.setState({ pendingOrders: [], selectedUnit: null });
+          }
+          return result;
+        } catch (err) {
+          return { success: false, error: 'Failed to submit builds' };
+        }
+      },
+    });
+
+    // Cleanup: restore original on unmount (prevents leaking singleplayer overrides)
+    return () => {
+      useGameStore.setState({
+        submitOrders: originalSubmitOrders,
+        pendingOrders: [],
+        selectedUnit: null,
+      });
+    };
+  }, [gameId, faction, fetchState]);
+
   useEffect(() => {
     fetchState();
   }, [fetchState]);
-
-  // Add an order
-  const addOrder = (order) => {
-    setPendingOrders(prev => {
-      // Replace if same unit already has an order
-      const filtered = prev.filter(o => o.location !== order.location);
-      return [...filtered, order];
-    });
-  };
-
-  // Remove an order
-  const removeOrder = (index) => {
-    setPendingOrders(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Clear all orders
-  const clearOrders = () => setPendingOrders([]);
-
-  // Submit orders
-  const submitOrders = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orders: pendingOrders }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setLastResults(result.resolution);
-        if (result.gameState) setGameState(result.gameState);
-        if (result.playerState) setPlayerState(result.playerState);
-        setPendingOrders([]);
-
-        // Handle retreat/build phases
-        if (result.resolution?.phase === 'retreats' || result.resolution?.phase === 'builds') {
-          // Refresh state to get updated phase info
-          await fetchState();
-        }
-      } else {
-        setError(result.reason || result.errors?.map(e => e.reason).join(', ') || 'Failed to submit orders');
-      }
-    } catch (err) {
-      setError('Failed to submit orders');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Submit retreats
-  const submitRetreats = async (retreats) => {
-    setSubmitting(true);
-    try {
-      const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/retreats`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retreats }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        if (result.gameState) setGameState(result.gameState);
-        if (result.playerState) setPlayerState(result.playerState);
-      }
-    } catch (err) {
-      setError('Failed to submit retreats');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Submit builds
-  const submitBuilds = async (builds) => {
-    setSubmitting(true);
-    try {
-      const response = await fetch(`${API_URL}/api/singleplayer/${gameId}/builds`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ builds }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        if (result.gameState) setGameState(result.gameState);
-        if (result.playerState) setPlayerState(result.playerState);
-      }
-    } catch (err) {
-      setError('Failed to submit builds');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   // Use ability
   const handleUseAbility = async (abilityName, params) => {
@@ -200,7 +202,6 @@ export default function SinglePlayerGame() {
           ))}
         </div>
 
-        {/* SC standings */}
         <div className="bg-gray-800 rounded-lg p-4 mb-6 w-80">
           <h3 className="text-lcars-tan text-sm mb-3">Final Standings</h3>
           <div className="space-y-2">
@@ -238,9 +239,6 @@ export default function SinglePlayerGame() {
     );
   }
 
-  const myUnits = playerState.myUnits || [];
-  const phase = gameState.phase;
-
   return (
     <div className="h-screen flex flex-col bg-space-dark text-white">
       {/* Status Bar */}
@@ -270,248 +268,11 @@ export default function SinglePlayerGame() {
           <GameMap gameState={gameState} faction={faction} />
         </div>
 
-        {/* Order Panel (custom for single-player) */}
-        <div className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col overflow-y-auto">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="text-lcars-orange font-bold text-sm">
-              {phase === 'orders' ? 'Orders Phase' :
-               phase === 'retreats' ? 'Retreat Phase' :
-               phase === 'builds' ? 'Build Phase' : phase}
-            </h3>
-            <div className="text-xs text-gray-400 mt-1">
-              Turn {gameState.turn} - {gameState.season} {gameState.year}
-            </div>
-          </div>
-
-          {/* Orders Phase */}
-          {phase === 'orders' && (
-            <div className="flex-1 p-4 space-y-3">
-              <div className="text-xs text-gray-400 mb-2">
-                {myUnits.length} unit(s) - {pendingOrders.length} order(s)
-              </div>
-
-              {/* Unit list with quick-order buttons */}
-              {myUnits.map(unit => {
-                const hasOrder = pendingOrders.find(o => o.location === unit.position);
-                return (
-                  <div key={unit.position} className="bg-gray-800 rounded p-2 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono">
-                        {unit.type === 'army' ? 'A' : 'F'} {unit.position.toUpperCase()}
-                      </span>
-                      {hasOrder ? (
-                        <span className="text-green-400 text-xs">
-                          {hasOrder.type.toUpperCase()}
-                          {hasOrder.destination && ` → ${hasOrder.destination.toUpperCase()}`}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => addOrder({ type: 'hold', location: unit.position, faction })}
-                          className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded"
-                        >
-                          Hold
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Pending Orders */}
-              {pendingOrders.length > 0 && (
-                <div className="space-y-1 border-t border-gray-700 pt-3">
-                  <div className="text-sm font-bold text-lcars-tan">Pending Orders:</div>
-                  {pendingOrders.map((order, i) => (
-                    <div key={i} className="flex justify-between items-center text-xs bg-gray-800 rounded p-2">
-                      <span>
-                        {order.location.toUpperCase()} {order.type.toUpperCase()}
-                        {order.destination && ` → ${order.destination.toUpperCase()}`}
-                      </span>
-                      <button onClick={() => removeOrder(i)} className="text-red-400 hover:text-red-300">x</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={submitOrders}
-                  disabled={submitting || pendingOrders.length === 0}
-                  className="flex-1 px-4 py-2 bg-lcars-orange hover:bg-lcars-tan text-black font-bold rounded text-sm disabled:opacity-50"
-                >
-                  {submitting ? 'Resolving...' : 'Submit Orders'}
-                </button>
-                <button
-                  onClick={clearOrders}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Retreats Phase */}
-          {phase === 'retreats' && playerState.myDislodged?.length > 0 && (
-            <div className="flex-1 p-4 space-y-3">
-              <div className="text-yellow-400 text-sm font-bold">Units need to retreat!</div>
-              {playerState.myDislodged.map((d, i) => (
-                <div key={i} className="bg-gray-800 rounded p-3">
-                  <div className="text-sm mb-2">Unit at {d.location.toUpperCase()}</div>
-                  {d.retreatOptions.length > 0 ? (
-                    <div className="space-y-1">
-                      {d.retreatOptions.map(opt => (
-                        <button
-                          key={opt}
-                          onClick={() => submitRetreats([{ from: d.location, to: opt, type: 'retreat' }])}
-                          disabled={submitting}
-                          className="w-full text-left px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
-                        >
-                          Retreat to {opt.toUpperCase()}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => submitRetreats([{ location: d.location, type: 'disband' }])}
-                        disabled={submitting}
-                        className="w-full text-left px-2 py-1 bg-red-900 hover:bg-red-800 rounded text-xs text-red-300"
-                      >
-                        Disband
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-red-400 text-xs">No retreat options — unit will be disbanded</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Builds Phase */}
-          {phase === 'builds' && (
-            <BuildPanel
-              playerState={playerState}
-              faction={faction}
-              submitting={submitting}
-              onSubmitBuilds={submitBuilds}
-            />
-          )}
-
-          {/* Last Results */}
-          {lastResults && (
-            <div className="p-4 border-t border-gray-700">
-              <div className="text-xs text-gray-400 mb-1">Last Resolution:</div>
-              <div className="text-xs text-gray-300">
-                Phase: {lastResults.phase || 'orders'}
-                {lastResults.results?.length > 0 && ` (${lastResults.results.length} events)`}
-              </div>
-            </div>
-          )}
+        {/* Reuse the real OrderPanel */}
+        <div className="w-80 bg-gray-900 border-l border-gray-700 overflow-y-auto">
+          <OrderPanel gameState={gameState} myState={playerState} faction={faction} />
         </div>
       </div>
-    </div>
-  );
-}
-
-function BuildPanel({ playerState, faction, submitting, onSubmitBuilds }) {
-  const [pendingBuilds, setPendingBuilds] = useState([]);
-  const buildCount = playerState.buildCount || 0;
-  const buildLocations = playerState.buildLocations || { armies: [], fleets: [] };
-
-  if (buildCount === 0) {
-    return (
-      <div className="flex-1 p-4">
-        <div className="text-gray-400 text-sm">No builds or disbands needed.</div>
-        <button
-          onClick={() => onSubmitBuilds([])}
-          disabled={submitting}
-          className="mt-4 px-4 py-2 bg-lcars-orange hover:bg-lcars-tan text-black font-bold rounded text-sm w-full"
-        >
-          Continue
-        </button>
-      </div>
-    );
-  }
-
-  const remaining = buildCount > 0
-    ? buildCount - pendingBuilds.filter(b => b.type === 'build').length
-    : Math.abs(buildCount) - pendingBuilds.filter(b => b.type === 'disband').length;
-
-  return (
-    <div className="flex-1 p-4 space-y-3">
-      <div className="text-sm font-bold text-lcars-tan">
-        {buildCount > 0 ? `Build ${buildCount} unit(s)` : `Disband ${Math.abs(buildCount)} unit(s)`}
-      </div>
-      <div className="text-xs text-gray-400">Remaining: {remaining}</div>
-
-      {buildCount > 0 && (
-        <>
-          {buildLocations.armies?.length > 0 && (
-            <div>
-              <div className="text-xs text-gray-400 mb-1">Build Army:</div>
-              {buildLocations.armies.map(loc => (
-                <button
-                  key={loc}
-                  onClick={() => setPendingBuilds(prev => [...prev, { type: 'build', location: loc, unitType: 'army' }])}
-                  disabled={remaining <= 0}
-                  className="w-full text-left px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs mb-1 disabled:opacity-50"
-                >
-                  Army at {loc.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-          {buildLocations.fleets?.length > 0 && (
-            <div>
-              <div className="text-xs text-gray-400 mb-1">Build Fleet:</div>
-              {buildLocations.fleets.map(loc => (
-                <button
-                  key={loc}
-                  onClick={() => setPendingBuilds(prev => [...prev, { type: 'build', location: loc, unitType: 'fleet' }])}
-                  disabled={remaining <= 0}
-                  className="w-full text-left px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs mb-1 disabled:opacity-50"
-                >
-                  Fleet at {loc.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {buildCount < 0 && (
-        <div>
-          <div className="text-xs text-gray-400 mb-1">Disband unit:</div>
-          {(playerState.myUnits || []).map(unit => (
-            <button
-              key={unit.position}
-              onClick={() => setPendingBuilds(prev => [...prev, { type: 'disband', location: unit.position }])}
-              disabled={remaining <= 0}
-              className="w-full text-left px-2 py-1 bg-red-900 hover:bg-red-800 rounded text-xs mb-1 text-red-300 disabled:opacity-50"
-            >
-              {unit.type === 'army' ? 'A' : 'F'} {unit.position.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {pendingBuilds.length > 0 && (
-        <div className="space-y-1 border-t border-gray-700 pt-2">
-          {pendingBuilds.map((b, i) => (
-            <div key={i} className="flex justify-between text-xs bg-gray-800 rounded p-1 px-2">
-              <span>{b.type === 'build' ? `Build ${b.unitType} at ${b.location.toUpperCase()}` : `Disband at ${b.location.toUpperCase()}`}</span>
-              <button onClick={() => setPendingBuilds(prev => prev.filter((_, j) => j !== i))} className="text-red-400">x</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={() => onSubmitBuilds(pendingBuilds)}
-        disabled={submitting || remaining > 0}
-        className="w-full px-4 py-2 bg-lcars-orange hover:bg-lcars-tan text-black font-bold rounded text-sm disabled:opacity-50"
-      >
-        {submitting ? 'Processing...' : 'Submit Builds'}
-      </button>
     </div>
   );
 }
