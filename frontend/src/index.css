@@ -58,8 +58,7 @@
 
 /* Order panel */
 .order-panel {
-  @apply fixed right-0 top-0 h-full w-80 bg-space-blue border-l-4 
-         border-lcars-orange p-4 overflow-y-auto;
+  @apply w-80 bg-space-blue border-l-4 border-lcars-orange overflow-y-auto;
 }
 
 /* Chat panel */
@@ -81,7 +80,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .order-panel {
-    @apply w-full h-auto bottom-0 top-auto max-h-[40vh];
+    @apply w-full h-auto max-h-[40vh];
   }
   
   .chat-panel {

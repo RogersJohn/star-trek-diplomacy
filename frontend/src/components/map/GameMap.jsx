@@ -21,6 +21,7 @@ export default function GameMap({ gameState, faction }) {
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 600 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const didDragRef = useRef(false)
   const svgRef = useRef(null)
 
   // Build planet adjacency map
@@ -153,6 +154,7 @@ export default function GameMap({ gameState, faction }) {
 
   // Unified position click handler for both 2D and 3D views
   const handlePositionClick = (positionId) => {
+    if (didDragRef.current) return
     if (gameState?.phase !== 'orders') return
 
     if (orderMode === 'convoy') {
@@ -265,36 +267,41 @@ export default function GameMap({ gameState, faction }) {
     }
   }
 
-  // Zoom handler: scroll wheel zooms toward cursor
-  const handleWheel = (e) => {
-    e.preventDefault()
-    const scaleFactor = e.deltaY > 0 ? 1.1 : 0.9
+  // Zoom handler: attach with { passive: false } so preventDefault works
+  useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
-    const point = svg.createSVGPoint()
-    point.x = e.clientX
-    point.y = e.clientY
-    const svgPoint = point.matrixTransform(svg.getScreenCTM().inverse())
+    const handleWheel = (e) => {
+      e.preventDefault()
+      const scaleFactor = e.deltaY > 0 ? 1.1 : 0.9
+      const point = svg.createSVGPoint()
+      point.x = e.clientX
+      point.y = e.clientY
+      const svgPoint = point.matrixTransform(svg.getScreenCTM().inverse())
 
-    setViewBox(prev => {
-      const newW = prev.w * scaleFactor
-      const newH = prev.h * scaleFactor
-      const dx = (svgPoint.x - prev.x) * (1 - scaleFactor)
-      const dy = (svgPoint.y - prev.y) * (1 - scaleFactor)
-      return {
-        x: prev.x + dx,
-        y: prev.y + dy,
-        w: Math.max(200, Math.min(1600, newW)),
-        h: Math.max(150, Math.min(1200, newH)),
-      }
-    })
-  }
+      setViewBox(prev => {
+        const newW = prev.w * scaleFactor
+        const newH = prev.h * scaleFactor
+        const dx = (svgPoint.x - prev.x) * (1 - scaleFactor)
+        const dy = (svgPoint.y - prev.y) * (1 - scaleFactor)
+        return {
+          x: prev.x + dx,
+          y: prev.y + dy,
+          w: Math.max(200, Math.min(1600, newW)),
+          h: Math.max(150, Math.min(1200, newH)),
+        }
+      })
+    }
+    svg.addEventListener('wheel', handleWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', handleWheel)
+  }, [])
 
-  // Pan handlers: middle-click or Alt+click to drag
+  // Pan handlers: left-click drag (Google Maps style)
   const handleMouseDown = (e) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    if (e.button === 0 || e.button === 1) {
       setIsPanning(true)
       setPanStart({ x: e.clientX, y: e.clientY })
+      didDragRef.current = false
     }
   }
 
@@ -305,6 +312,9 @@ export default function GameMap({ gameState, faction }) {
     const ctm = svg.getScreenCTM()
     const dx = (e.clientX - panStart.x) / ctm.a
     const dy = (e.clientY - panStart.y) / ctm.d
+    if (Math.abs(e.clientX - panStart.x) > 3 || Math.abs(e.clientY - panStart.y) > 3) {
+      didDragRef.current = true
+    }
     setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }))
     setPanStart({ x: e.clientX, y: e.clientY })
   }
@@ -437,8 +447,7 @@ export default function GameMap({ gameState, faction }) {
           ref={svgRef}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
           className="w-full h-full"
-          style={{ background: '#0a0a12', cursor: isPanning ? 'grabbing' : 'default' }}
-          onWheel={handleWheel}
+          style={{ background: '#0a0a12', cursor: isPanning ? 'grabbing' : 'grab' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
