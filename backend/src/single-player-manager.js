@@ -140,7 +140,18 @@ class SinglePlayerManager extends GameManager {
       if (this.pendingOrders[faction]) return;
 
       const { orders, abilityActions } = ai.generateOrders(this.state);
-      this.submitOrders(faction, orders);
+      const result = this.submitOrders(faction, orders);
+
+      if (!result.success) {
+        // AI generated invalid orders — fall back to all holds
+        console.warn(`AI ${faction} generated invalid orders: ${result.reason || JSON.stringify(result.errors?.slice(0, 2))}. Falling back to holds.`);
+        const holdOrders = this.state.getUnits(faction).map(u => ({
+          type: 'hold',
+          location: u.position,
+          faction,
+        }));
+        this.submitOrders(faction, holdOrders);
+      }
 
       // Process ability actions
       abilityActions.forEach(action => {
@@ -183,7 +194,12 @@ class SinglePlayerManager extends GameManager {
 
       const availableLocations = this.getAvailableBuildLocations(faction);
       const builds = ai.chooseBuild(this.state, buildCount, availableLocations);
-      this.submitBuilds(faction, builds);
+      const result = this.submitBuilds(faction, builds);
+
+      if (!result.success) {
+        console.warn(`AI ${faction} build submission failed: ${result.reason}. Submitting empty builds.`);
+        this.submitBuilds(faction, []);
+      }
     });
   }
 }
